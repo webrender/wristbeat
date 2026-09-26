@@ -1,13 +1,19 @@
 package wristbeat.app
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -21,7 +27,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import kotlin.math.PI
@@ -42,9 +47,9 @@ private const val CYCLE_BEATS = 8.0
 
 /**
  * Snap Crabs: the lead crab snaps a pattern, then it's the player's turn one bar later.
- * Reuses the same anticipatory-sweep idea from Calibrate (a marker that arrives on the beat,
- * not just a flash after it) so the "when do I click" question has one consistent answer
- * across stages.
+ * A note highway (like a rhythm game's approaching notes) shows upcoming call and response
+ * beats sliding toward a fixed hit line, so exactly when a tap is expected is visible ahead
+ * of time, not just reacted to after the fact.
  */
 @Composable
 fun SnapCrabsScreen() {
@@ -63,6 +68,7 @@ fun SnapCrabsScreen() {
     var nextLeadCueIndex by remember { mutableStateOf(0) }
     var leadPulsePhase by remember { mutableStateOf(0f) }
     var nextTargetIndex by remember { mutableStateOf(0) }
+    var targetPulsePhase by remember { mutableStateOf(0f) }
     var playerPulsePhase by remember { mutableStateOf(0f) }
     var tally by remember { mutableStateOf(ScoreTally()) }
     val runLengthSeconds = remember { (SNAP_CRABS_END_BEATS * SECONDS_PER_BEAT).roundToInt() }
@@ -98,9 +104,11 @@ fun SnapCrabsScreen() {
             }
             while (nextTargetIndex < stage.targets.size && beat >= stage.targets[nextTargetIndex]) {
                 nextTargetIndex++
+                targetPulsePhase = 1f
             }
             beatFlashPhase = (beatFlashPhase - dt * 4f).coerceAtLeast(0f)
             leadPulsePhase = (leadPulsePhase - dt * 5f).coerceAtLeast(0f)
+            targetPulsePhase = (targetPulsePhase - dt * 5f).coerceAtLeast(0f)
             playerPulsePhase = (playerPulsePhase - dt * 5f).coerceAtLeast(0f)
 
             stage.updateMisses(beat)
@@ -119,6 +127,7 @@ fun SnapCrabsScreen() {
             beatPosition = -1.0
             nextLeadCueIndex = 0
             nextTargetIndex = 0
+            targetPulsePhase = 0f
             tally = ScoreTally()
             finished = false
             started = true
@@ -148,8 +157,8 @@ fun SnapCrabsScreen() {
             .pointerInput(Unit) { detectTapGestures { handleTap() } },
         contentAlignment = Alignment.Center,
     ) {
-        // Reserve room below the circle for the status text (same fix as CalibrateScreen).
-        val textReserve = 150.dp
+        // Reserve room below the circle for the legend + status text (same fix as CalibrateScreen).
+        val textReserve = 180.dp
         val availableHeight = (maxHeight - textReserve).coerceAtLeast(120.dp)
         val diameter = if (maxWidth < availableHeight) maxWidth else availableHeight
 
@@ -157,24 +166,37 @@ fun SnapCrabsScreen() {
             Canvas(modifier = Modifier.size(diameter)) {
                 drawCircle(color = Color(0xFF123B3D), radius = size.minDimension / 2f)
 
-                val beatMarkerCenter = Offset(center.x, size.height * 0.22f)
-                drawBeatIndicator(beatMarkerCenter, size.minDimension * 0.14f, beatPosition, beatFlashPhase, started && !finished)
+                drawNoteHighway(
+                    leadCues = stage.leadCues,
+                    targets = stage.targets,
+                    beatPosition = beatPosition,
+                    lookaheadBeats = 2.5,
+                    hitFlash = maxOf(beatFlashPhase * 0.5f, targetPulsePhase),
+                    laneY = size.height * 0.32f,
+                    laneLeftX = size.width * 0.20f,
+                    laneRightX = size.width * 0.92f,
+                )
 
                 val bodyRadius = size.minDimension * 0.13f
                 drawCrab(
-                    Offset(size.width * 0.28f, size.height * 0.62f),
+                    Offset(size.width * 0.28f, size.height * 0.66f),
                     bodyRadius,
                     Color(0xFFDE4636),
                     leadPulsePhase,
                 )
                 drawCrab(
-                    Offset(size.width * 0.72f, size.height * 0.62f),
+                    Offset(size.width * 0.72f, size.height * 0.66f),
                     bodyRadius,
                     Color(0xFF3F82D8),
                     playerPulsePhase,
                 )
             }
 
+            Spacer(Modifier.height(4.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                LegendDot(Color(0xFFDE4636), "Call")
+                LegendDot(Color(0xFF6FB6FF), "Your tap")
+            }
             Spacer(Modifier.height(4.dp))
 
             when {
@@ -217,18 +239,61 @@ private fun sectionLabel(beat: Double): String = when {
     else -> "Your turn — repeat it"
 }
 
-/** Same anticipatory-sweep + on-beat flash as Calibrate, just smaller and off to the side. */
-private fun DrawScope.drawBeatIndicator(pos: Offset, radius: Float, beatPosition: Double, flashPhase: Float, active: Boolean) {
-    drawCircle(Color.White.copy(alpha = 0.10f), radius = radius, center = pos, style = Stroke(width = 2f))
-    val phase = if (beatPosition < 0) 0.0 else beatPosition - floor(beatPosition)
-    val angle = (-90f + phase.toFloat() * 360f) * (PI.toFloat() / 180f)
-    val marker = Offset(pos.x + radius * cos(angle), pos.y + radius * sin(angle))
-    if (active) {
-        drawLine(Color(0xFFFFB320), pos, marker, strokeWidth = 3f)
-        drawCircle(Color(0xFFFFB320), radius = 5f, center = marker)
+/**
+ * A note highway: upcoming lead-crab calls (top row) and player targets (bottom row) slide in
+ * from the right and arrive at the hit line exactly on their beat, giving the same anticipation
+ * as Calibrate's sweep but tied to the actual, sparse call-and-response events instead of every beat.
+ */
+private fun DrawScope.drawNoteHighway(
+    leadCues: List<Double>,
+    targets: List<Double>,
+    beatPosition: Double,
+    lookaheadBeats: Double,
+    hitFlash: Float,
+    laneY: Float,
+    laneLeftX: Float,
+    laneRightX: Float,
+) {
+    val rowGap = size.height * 0.045f
+    val leadRowY = laneY - rowGap
+    val targetRowY = laneY + rowGap
+
+    drawLine(Color.White.copy(alpha = 0.08f), Offset(laneLeftX, leadRowY), Offset(laneRightX, leadRowY), strokeWidth = 2f)
+    drawLine(Color.White.copy(alpha = 0.12f), Offset(laneLeftX, targetRowY), Offset(laneRightX, targetRowY), strokeWidth = 2f)
+
+    // Hit line: spans both rows, flashes on every beat and flares brighter exactly when a
+    // target arrives, so it doubles as both a metronome and the "tap now" cue.
+    drawLine(
+        Color(0xFFFFE29A).copy(alpha = 0.35f + 0.65f * hitFlash),
+        Offset(laneLeftX, leadRowY - 10f),
+        Offset(laneLeftX, targetRowY + 10f),
+        strokeWidth = 3f + 6f * hitFlash,
+    )
+
+    fun xFor(beat: Double): Float {
+        val fraction = ((beat - beatPosition) / lookaheadBeats).toFloat()
+        return laneLeftX + fraction * (laneRightX - laneLeftX)
     }
-    drawCircle(Color.White, radius = 6f + 10f * flashPhase, center = pos, alpha = 0.15f + 0.5f * flashPhase)
-    drawCircle(Color.White, radius = 4f, center = pos)
+
+    for (cue in leadCues) {
+        val untilCue = cue - beatPosition
+        if (untilCue < -0.05 || untilCue > lookaheadBeats) continue
+        drawCircle(Color(0xFFDE4636).copy(alpha = 0.75f), radius = 6f, center = Offset(xFor(cue), leadRowY))
+    }
+    for (target in targets) {
+        val untilTarget = target - beatPosition
+        if (untilTarget < -0.05 || untilTarget > lookaheadBeats) continue
+        drawCircle(Color(0xFF6FB6FF), radius = 8f, center = Offset(xFor(target), targetRowY))
+    }
+}
+
+@Composable
+private fun LegendDot(color: Color, label: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(modifier = Modifier.size(8.dp).background(color, CircleShape))
+        Spacer(Modifier.width(6.dp))
+        Text(label, color = Color(0xFFAAB8B5))
+    }
 }
 
 /** A simplified crab: a body circle with two claw lines that swing open on [pulsePhase] (0 = closed, 1 = snapped). */
