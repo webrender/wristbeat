@@ -60,7 +60,7 @@ private const val CYCLE_BEATS = 8.0
  * of time, not just reacted to after the fact.
  */
 @Composable
-fun SnapCrabsScreen(inputOffsetMs: Double) {
+fun SnapCrabsScreen(inputOffsetMs: Double, chart: ChartSetting) {
     val audioClock = remember { AudioClock() }
     val audioEngine = remember { AudioEngine() }
     val haptics = remember { HapticEngine() }
@@ -79,8 +79,9 @@ fun SnapCrabsScreen(inputOffsetMs: Double) {
     var targetPulsePhase by remember { mutableStateOf(0f) }
     var playerPulsePhase by remember { mutableStateOf(0f) }
     var tally by remember { mutableStateOf(ScoreTally()) }
-    var showHighway by remember { mutableStateOf(true) }
     val runLengthSeconds = remember { (SNAP_CRABS_END_BEATS * SECONDS_PER_BEAT).roundToInt() }
+    val highwayCues = remember(stage) { stage.leadCues.map { HighwayNote(it, Color(0xFFDE4636).copy(alpha = 0.75f), 6f) } }
+    val highwayTargets = remember(stage) { stage.targets.map { HighwayNote(it, Color(0xFF6FB6FF), 8f) } }
 
     LaunchedEffect(started, finished) {
         var lastFrameMillis = 0L
@@ -181,10 +182,10 @@ fun SnapCrabsScreen(inputOffsetMs: Double) {
 
             drawBeachBackground(size.width, size.height, beatPosition)
 
-            if (showHighway) {
+            if (chart.on) {
                 drawNoteHighway(
-                    leadCues = stage.leadCues,
-                    targets = stage.targets,
+                    cues = highwayCues,
+                    targets = highwayTargets,
                     beatPosition = beatPosition,
                     lookaheadBeats = 2.5,
                     hitFlash = maxOf(beatFlashPhase * 0.5f, targetPulsePhase),
@@ -217,15 +218,7 @@ fun SnapCrabsScreen(inputOffsetMs: Double) {
             )
         }
 
-        Column(
-            modifier = Modifier.align(Alignment.TopStart).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            HudChip { HudText("Snap Crabs", color = Color(0xFF2FBF9E)) }
-            ChartToggle(showHighway) { showHighway = !showHighway }
-        }
-
-        HudChip(modifier = Modifier.align(Alignment.TopCenter).padding(top = 16.dp)) {
+        StageHeader("Snap Crabs", Color(0xFF2FBF9E), chart) {
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 LegendDot(Color(0xFFDE4636), "Call")
                 LegendDot(Color(0xFF6FB6FF), "Your tap")
@@ -296,72 +289,6 @@ private fun sectionLabel(beat: Double): String = when {
 }
 
 /**
- * A note highway: upcoming lead-crab calls (top row) and player targets (bottom row) slide in
- * from the right and arrive at the hit line exactly on their beat, giving the same anticipation
- * as Calibrate's sweep but tied to the actual, sparse call-and-response events instead of every beat.
- */
-private fun DrawScope.drawNoteHighway(
-    leadCues: List<Double>,
-    targets: List<Double>,
-    beatPosition: Double,
-    lookaheadBeats: Double,
-    hitFlash: Float,
-    laneY: Float,
-    laneLeftX: Float,
-    laneRightX: Float,
-) {
-    val rowGap = size.height * 0.045f
-    val leadRowY = laneY - rowGap
-    val targetRowY = laneY + rowGap
-
-    // A HUD ribbon behind just the highway (not the whole stage) keeps the lanes legible over the
-    // beach without covering it in a web-card rectangle.
-    val padding = (laneRightX - laneLeftX) * 0.05f
-    drawRect(
-        brush = Brush.horizontalGradient(
-            colors = listOf(
-                Color.Transparent,
-                Color.Black.copy(alpha = 0.32f),
-                Color.Black.copy(alpha = 0.32f),
-                Color.Transparent,
-            ),
-            startX = laneLeftX - padding,
-            endX = laneRightX + padding,
-        ),
-        topLeft = Offset(laneLeftX - padding, leadRowY - rowGap * 1.3f),
-        size = Size((laneRightX - laneLeftX) + padding * 2f, rowGap * 2.6f),
-    )
-
-    drawLine(Color.White.copy(alpha = 0.08f), Offset(laneLeftX, leadRowY), Offset(laneRightX, leadRowY), strokeWidth = 2f)
-    drawLine(Color.White.copy(alpha = 0.12f), Offset(laneLeftX, targetRowY), Offset(laneRightX, targetRowY), strokeWidth = 2f)
-
-    // Hit line: spans both rows, flashes on every beat and flares brighter exactly when a
-    // target arrives, so it doubles as both a metronome and the "tap now" cue.
-    drawLine(
-        Color(0xFFFFE29A).copy(alpha = 0.35f + 0.65f * hitFlash),
-        Offset(laneLeftX, leadRowY - 10f),
-        Offset(laneLeftX, targetRowY + 10f),
-        strokeWidth = 3f + 6f * hitFlash,
-    )
-
-    fun xFor(beat: Double): Float {
-        val fraction = ((beat - beatPosition) / lookaheadBeats).toFloat()
-        return laneLeftX + fraction * (laneRightX - laneLeftX)
-    }
-
-    for (cue in leadCues) {
-        val untilCue = cue - beatPosition
-        if (untilCue < -0.05 || untilCue > lookaheadBeats) continue
-        drawCircle(Color(0xFFDE4636).copy(alpha = 0.75f), radius = 6f, center = Offset(xFor(cue), leadRowY))
-    }
-    for (target in targets) {
-        val untilTarget = target - beatPosition
-        if (untilTarget < -0.05 || untilTarget > lookaheadBeats) continue
-        drawCircle(Color(0xFF6FB6FF), radius = 8f, center = Offset(xFor(target), targetRowY))
-    }
-}
-
-/**
  * A beach scene (sky, sun, animated water, foam line, sand) that bleeds to fill the whole canvas,
  * per HANDOFF's "extended background" note. Ported from the prototype's drawBeach, including the
  * scrolling wave strokes, so the scenery reads as game art instead of flat CSS-gradient rectangles.
@@ -419,17 +346,6 @@ private fun DrawScope.drawBeachBackground(w: Float, h: Float, beatPosition: Doub
         val fx = (i * 53 % 977) / 977f
         val fy = (i * 131 % 613) / 613f
         drawRect(Color(0xFFE3BC80), topLeft = Offset(fx * w, sandTop + fy * sandHeight), size = Size(3f, 2f))
-    }
-}
-
-/** Lets a player hide the note highway (the "visual beat indicator chart") and play by ear alone. */
-@Composable
-private fun ChartToggle(on: Boolean, onToggle: () -> Unit) {
-    GameButton(
-        accent = if (on) Color(0xFF2FBF9E) else Color(0xFF16302D),
-        onClick = onToggle,
-    ) {
-        HudText(if (on) "Chart: on" else "Chart: off", color = if (on) Color(0xFF06211D) else Color(0xFFAAB8B5))
     }
 }
 

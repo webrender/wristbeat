@@ -30,7 +30,8 @@ build and launch the shared `App()`), but their platform actuals are placeholder
 - **`composeApp/`** — the Compose UI and platform adapters.
   - `commonMain` — `App.kt` (stage switching), `CalibrateScreen.kt`, `SnapCrabsScreen.kt`,
     `MangoChopScreen.kt`,
-    `Hud.kt` (shared HUD text/chip styling), `InputHandling.kt` (keyboard tap support), and
+    `Hud.kt` (shared HUD text/chip styling), `StageHud.kt` (each stage's top HUD — title, chart
+    toggle, legend — laid out around the stage tabs), `NoteHighway.kt` (the shared note highway), `InputHandling.kt` (keyboard tap support), and
     `expect` declarations for `AudioClock`/`AudioEngine`/`HapticEngine`.
   - `wasmJsMain` — the `actual` implementations: `AudioClock` wraps `AudioContext`'s output
     timestamp, `AudioEngine` synthesizes every sound via Web Audio `js()` interop
@@ -58,13 +59,15 @@ into the same timebase before judging, per HANDOFF's timing-accuracy requirement
   shows upcoming calls/targets sliding toward a hit line, backing band (kick/rim/hat/bass/uke +
   a melody line) plays underneath, and there's a live Perfect/OK/Miss tally with a results screen.
   The note highway (the "visual beat indicator chart") can be toggled off via the `Chart: On/Off`
-  button under the stage label, for playing by ear alone.
+  button under the stage label, for playing by ear alone. That setting is app-wide (held in
+  `App.kt`), so it applies to every stage with a highway.
 - **Mango Chop** — playable at 132 BPM (faster than the other stages' 116), with a steel pan added
   to the band. A whistle marks each toss: mangoes land 2 beats later and limes 1 beat later, and
   both are chopped with a tap. Pineapples (introduced in the third section, tossed from the right
   with a falling double whistle) land 2 beats later and need a **swipe** to slice. The wrong action
   is a stray: it consumes nothing, and the fruit bounces off as a miss if it isn't corrected in time.
-  There's no note highway; the fruit arcs are the visual cue.
+  Its note highway shows each whistle on the top row and each landing on the bottom row (pineapples
+  as diamonds, since they're swiped), and hides with the same chart toggle.
 - **Input** — pointer/touch taps everywhere, plus Space/J/F/Enter on the keyboard
   (`InputHandling.kt`'s `rememberTapKeyModifier`), matching HANDOFF's documented web input mapping.
   Taps are judged when the finger **lands** (`detectTapGestures(onPress = …)`), not on release, so
@@ -77,6 +80,11 @@ into the same timebase before judging, per HANDOFF's timing-accuracy requirement
   choice, not an accident):
   - No app-level header/footer chrome. `App.kt` has no title bar; stage switching is a small tab
     strip floated in a corner over the game (`StageTabs`), not a page nav row.
+  - Top HUD layout: stages put their title/chart toggle/legend in `StageHeader`, never positioned by
+    hand. Wide screens stack it in the top-left column with the tabs top-right; below 720dp
+    (`COMPACT_HUD_MAX_WIDTH`) the tabs switch to short labels centered on the top edge, and the
+    header drops its title and flows centered underneath, so nothing overlaps on a phone. Both
+    respect `WindowInsets.safeDrawing` (display cutouts on Android).
   - Each stage screen is a single full-bleed `Canvas(Modifier.fillMaxSize())` — status text,
     counters, and legends are HUD overlays positioned with `Box` + `Alignment`, not stacked above
     or below the canvas in a `Column`.

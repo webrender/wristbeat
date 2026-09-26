@@ -186,9 +186,7 @@ fun CalibrateScreen(onCalibrated: (offsetMs: Double) -> Unit) {
             drawCircle(Color.White, radius = 6f, center = target)
         }
 
-        HudChip(modifier = Modifier.align(Alignment.TopStart).padding(16.dp)) {
-            HudText("Calibrate", color = Color(0xFF2FBF9E))
-        }
+        StageHeader("Calibrate", Color(0xFF2FBF9E))
 
         Column(
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 28.dp),

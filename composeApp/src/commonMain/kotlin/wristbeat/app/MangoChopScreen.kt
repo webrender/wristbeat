@@ -41,6 +41,7 @@ import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.exp
+import kotlin.math.floor
 import kotlin.math.roundToInt
 import kotlin.math.sin
 import wristbeat.core.ChopAction
@@ -52,6 +53,7 @@ import wristbeat.core.MangoChopStage
 import wristbeat.core.Rank
 import wristbeat.core.ScoreTally
 import wristbeat.core.SoundId
+import wristbeat.core.Toss
 import wristbeat.core.TossResult
 
 /** A press held longer than this without moving isn't a tap any more (only matters for a deferred tap, see below). */
@@ -77,7 +79,7 @@ private enum class Cut { NONE, LEFT, RIGHT, TOP, BOTTOM }
  * On desktop, a mouse drag works the same way, and D/K/arrows slice (see [rememberTapKeyModifier]).
  */
 @Composable
-fun MangoChopScreen(inputOffsetMs: Double) {
+fun MangoChopScreen(inputOffsetMs: Double, chart: ChartSetting) {
     val audioClock = remember { AudioClock() }
     val audioEngine = remember { AudioEngine() }
     val haptics = remember { HapticEngine() }
@@ -95,6 +97,10 @@ fun MangoChopScreen(inputOffsetMs: Double) {
     var keySlashFlip by remember { mutableStateOf(false) }
     var tally by remember { mutableStateOf(ScoreTally()) }
     val runLengthSeconds = remember { (MANGO_CHOP_END_BEATS * secondsPerBeat).roundToInt() }
+    // Highway: each toss's whistle on the cue row, and its landing (the beat to act on) on the
+    // target row. Pineapples are diamonds, since they take a swipe rather than a tap.
+    val highwayCues = remember(stage) { stage.tosses.map { highwayNote(it.fruit, it.beat, cue = true) } }
+    val highwayTargets = remember(stage) { stage.tosses.map { highwayNote(it.fruit, it.landBeat, cue = false) } }
 
     LaunchedEffect(started, finished) {
         var lastFrameMillis = 0L
@@ -229,6 +235,21 @@ fun MangoChopScreen(inputOffsetMs: Double) {
 
             drawMarketBackground(squareLeft, squareTop, squareExtent, beatPosition)
 
+            if (chart.on) {
+                drawNoteHighway(
+                    cues = highwayCues,
+                    targets = highwayTargets,
+                    beatPosition = beatPosition,
+                    // Same scroll speed as Snap Crabs' 2.5 beats at 116 BPM, and a mango's whistle
+                    // (2 beats ahead of its landing) is on screen together with the landing.
+                    lookaheadBeats = 3.0,
+                    hitFlash = highwayFlash(beatPosition, stage.tosses, secondsPerBeat),
+                    laneY = squareTop + 0.36f * squareExtent,
+                    laneLeftX = squareLeft + 0.20f * squareExtent,
+                    laneRightX = squareLeft + 0.92f * squareExtent,
+                )
+            }
+
             // Everything interactive is authored in the prototype's 400×400 logical stage.
             withTransform({
                 translate(squareLeft, squareTop)
@@ -250,11 +271,7 @@ fun MangoChopScreen(inputOffsetMs: Double) {
             }
         }
 
-        HudChip(modifier = Modifier.align(Alignment.TopStart).padding(16.dp)) {
-            HudText("Mango Chop", color = Color(0xFFFFB320))
-        }
-
-        HudChip(modifier = Modifier.align(Alignment.TopCenter).padding(top = 16.dp)) {
+        StageHeader("Mango Chop", Color(0xFFFFB320), chart) {
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 LegendDot(Color(0xFFFFB320), "Tap: chop")
                 LegendDot(Color(0xFFE8A93A), "Swipe: slice")
@@ -317,6 +334,32 @@ fun MangoChopScreen(inputOffsetMs: Double) {
             }
         }
     }
+}
+
+private fun highwayNote(fruit: Fruit, beat: Double, cue: Boolean): HighwayNote {
+    val color = when (fruit) {
+        Fruit.MANGO -> Color(0xFFFFB320)
+        Fruit.LIME -> Color(0xFF86C537)
+        Fruit.PINEAPPLE -> Color(0xFFE8A93A)
+    }
+    return when {
+        fruit == Fruit.PINEAPPLE -> HighwayNote(beat, if (cue) color.copy(alpha = 0.75f) else color, if (cue) 7f else 10f, NoteShape.DIAMOND)
+        cue -> HighwayNote(beat, color.copy(alpha = 0.75f), 6f)
+        else -> HighwayNote(beat, color, 8f)
+    }
+}
+
+/**
+ * The hit line's flash: a soft pulse on every beat that decays over a quarter second, flaring to
+ * full as each fruit lands (decaying over 0.2s) — the same envelopes Snap Crabs drives per frame.
+ */
+private fun highwayFlash(beat: Double, tosses: List<Toss>, secondsPerBeat: Double): Float {
+    if (beat < 0) return 0f
+    val sinceBeat = (beat - floor(beat)) * secondsPerBeat
+    val beatFlash = (1.0 - sinceBeat / 0.25).coerceAtLeast(0.0)
+    val sinceLanding = tosses.map { beat - it.landBeat }.filter { it >= 0 }.minOrNull()?.times(secondsPerBeat)
+    val landFlash = if (sinceLanding == null) 0.0 else (1.0 - sinceLanding / 0.2).coerceAtLeast(0.0)
+    return maxOf(beatFlash * 0.5, landFlash).toFloat()
 }
 
 /**
