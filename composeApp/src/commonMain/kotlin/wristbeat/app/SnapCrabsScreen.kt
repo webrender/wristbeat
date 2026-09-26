@@ -158,6 +158,7 @@ fun SnapCrabsScreen() {
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
+            .then(rememberTapKeyModifier(::handleTap))
             .pointerInput(Unit) { detectTapGestures { handleTap() } },
         contentAlignment = Alignment.Center,
     ) {
