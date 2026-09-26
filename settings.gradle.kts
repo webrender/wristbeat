@@ -19,3 +19,5 @@ rootProject.name = "wristbeat"
 
 include(":core")
 include(":composeApp")
+include(":androidApp")
+include(":wearApp")

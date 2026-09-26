@@ -45,6 +45,8 @@ into the same timebase before judging, per HANDOFF's timing-accuracy requirement
 - **Snap Crabs** — fully playable: a lead crab snaps a call-and-response pattern, a note highway
   shows upcoming calls/targets sliding toward a hit line, backing band (kick/rim/hat/bass/uke +
   a melody line) plays underneath, and there's a live Perfect/OK/Miss tally with a results screen.
+  The note highway (the "visual beat indicator chart") can be toggled off via the `Chart: On/Off`
+  button under the stage label, for playing by ear alone.
 - **Mango Chop** — stubbed (`enabled = false` in `App.kt`'s `Stage` enum), shows "coming in a later
   iteration."
 - **Input** — pointer/touch taps everywhere, plus Space/J/F/Enter on the keyboard
@@ -61,9 +63,16 @@ into the same timebase before judging, per HANDOFF's timing-accuracy requirement
     interactive elements stay confined to the centered square. This directly implements HANDOFF's
     "keep the stage centered at the largest size that fits, extend background art in the margins"
     scaling rule — don't reintroduce a small watch-shaped clipped circle on desktop.
-  - Text goes through `Hud.kt`'s `HudText`/`HudChip` (bold, shadowed, letter-spaced, all-caps, in
-    small pill chips), not plain Material `Text`, so it reads as game HUD copy. This is styling on
-    top of the system font, not a custom display/pixel font — nobody has picked one yet.
+  - Text goes through `Hud.kt`'s `HudText`/`HudChip`, not plain Material `Text`, so it reads as
+    game HUD copy: shadowed, letter-spaced, all-caps, and set in **Sniglet** (OFL-licensed, see
+    `THIRD_PARTY_LICENSES/sniglet-OFL.txt`), a bubbly rounded display face loaded via Compose
+    Multiplatform's resource system (`composeApp/src/commonMain/composeResources/font/`) — real
+    ExtraBold/Regular font files, not synthetic bold on a system font. Every clickable control and
+    HUD backdrop (tabs, toggles, chips) goes through `Hud.kt`'s `GameButton`: a small-radius
+    rounded-rect panel with a color bevel, glassy top sheen, bright rim, and drop shadow, standing
+    in for a "console UI" look. Don't reach for a bare `RoundedCornerShape(50)` pill/stadium
+    shape or plain `Modifier.background()` chip — those read as web chips, not game UI, which is
+    exactly what this replaced.
 
 ## Build, test, run
 
@@ -93,7 +102,6 @@ screenshot check. Say so explicitly rather than claiming a visual change looks r
 ## Not started yet
 
 Android and Wear OS targets, a chart format/editor (charts are currently hard-coded Kotlin, e.g.
-`Charts.snapCrabsBacking`), Mango Chop, per-device/per-audio-route calibration storage, and a
-custom display font (current HUD look is system-font + bold/caps/shadow styling, see above). None
+`Charts.snapCrabsBacking`), Mango Chop, and per-device/per-audio-route calibration storage. None
 of these are in progress — don't start them without Jeremy asking, per his stated plan to dial in
 the web app first.

@@ -7,3 +7,4 @@ node_modules/
 *.hprof
 *:Zone.Identifier
 devserver.log
+local.properties

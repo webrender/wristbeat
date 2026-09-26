@@ -1,15 +1,23 @@
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     kotlin("multiplatform")
     id("org.jetbrains.compose")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("com.android.library")
 }
 
 @OptIn(ExperimentalWasmDsl::class)
 kotlin {
     compilerOptions {
         freeCompilerArgs.add("-Xexpect-actual-classes")
+    }
+
+    androidTarget {
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_17)
+        }
     }
 
     wasmJs {
@@ -32,6 +40,14 @@ kotlin {
     }
 }
 
-// Android target + Wear OS source set land in a later iteration, once the web build is dialed in:
-// androidTarget() with Oboe-backed AudioEngine/AudioClock actuals and a Vibrator/VibrationEffect-backed
-// HapticEngine actual, per HANDOFF.md's expect/actual plan.
+android {
+    namespace = "wristbeat.app"
+    compileSdk = 35
+    defaultConfig {
+        minSdk = 26
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+}
