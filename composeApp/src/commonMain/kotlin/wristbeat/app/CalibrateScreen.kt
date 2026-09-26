@@ -5,18 +5,16 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -134,93 +132,103 @@ fun CalibrateScreen() {
         if (errorMs != null) recentErrors = (recentErrors + errorMs).takeLast(16)
     }
 
-    BoxWithConstraints(
+    // A single full-bleed canvas with the status readout floated on top as a HUD overlay — no
+    // header/footer flow layout, so the dial always fills the whole screen edge to edge.
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .then(rememberTapKeyModifier(::handleTap))
             .pointerInput(Unit) { detectTapGestures { handleTap() } },
-        contentAlignment = Alignment.Center,
     ) {
-        // Reserve room below the stage for the status text so it can never get pushed off-screen.
-        val textReserve = 150.dp
-        val availableHeight = (maxHeight - textReserve).coerceAtLeast(120.dp)
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val squareExtent = minOf(size.width, size.height)
+            val stageCenter = Offset(size.width / 2f, size.height / 2f)
+            val radius = squareExtent / 2f * 0.85f
+            val safeRadius = radius * 0.85f
 
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            // The stage fills the available width — no longer clipped into a watch-sized circle on
-            // desktop. A round dial (with a proper watch-safe inset) sits centered in whatever square
-            // fits, and the extended background bleeds out to the sides per HANDOFF's scaling notes.
-            Canvas(modifier = Modifier.fillMaxWidth().height(availableHeight)) {
-                val squareExtent = minOf(size.width, size.height)
-                val stageCenter = Offset(size.width / 2f, size.height / 2f)
-                val radius = squareExtent / 2f * 0.85f
-                val safeRadius = radius * 0.85f
+            drawCalibrateBackground(size.width, size.height, stageCenter, radius * 1.35f)
 
-                drawCalibrateBackground(size.width, size.height, stageCenter, radius * 1.35f)
+            drawCircle(color = Color(0xFF0E3A3D), radius = radius, center = stageCenter)
+            drawCircle(color = Color.White.copy(alpha = 0.10f), radius = safeRadius, center = stageCenter, style = Stroke(width = 3f))
 
-                drawCircle(color = Color(0xFF0E3A3D), radius = radius, center = stageCenter)
-                drawCircle(color = Color.White.copy(alpha = 0.10f), radius = safeRadius, center = stageCenter, style = Stroke(width = 3f))
-
-                // Progress ring: how far through the fixed 36-beat run we are, so "how long is this"
-                // has a visible answer instead of just a number.
-                if (started) {
-                    val progress = (beatPosition / CALIBRATE_TOTAL_BEATS).coerceIn(0.0, 1.0).toFloat()
-                    drawArc(
-                        color = Color(0xFF2FBF9E),
-                        startAngle = -90f,
-                        sweepAngle = progress * 360f,
-                        useCenter = false,
-                        topLeft = Offset(stageCenter.x - radius + 3f, stageCenter.y - radius + 3f),
-                        size = Size((radius - 3f) * 2f, (radius - 3f) * 2f),
-                        style = Stroke(width = 5f),
-                    )
-                }
-
-                // Anticipatory sweep: one full revolution per beat, arriving at the target
-                // mark (12 o'clock) exactly when the click plays.
-                val phase = if (beatPosition < 0) 0.0 else beatPosition - floor(beatPosition)
-                val angle = (-90f + phase.toFloat() * 360f) * (PI.toFloat() / 180f)
-                val marker = Offset(stageCenter.x + safeRadius * cos(angle), stageCenter.y + safeRadius * sin(angle))
-                if (started && !finished) {
-                    drawLine(Color(0xFFFFB320), stageCenter, marker, strokeWidth = 4f)
-                    drawCircle(Color(0xFFFFB320), radius = 8f, center = marker)
-                }
-
-                // Target mark flashes exactly on the beat, giving a second, reactive confirmation.
-                val target = Offset(stageCenter.x, stageCenter.y - safeRadius)
-                drawCircle(Color.White, radius = 10f + 16f * flashPhase, center = target, alpha = 0.20f + 0.55f * flashPhase)
-                drawCircle(Color.White, radius = 6f, center = target)
+            // Progress ring: how far through the fixed 36-beat run we are, so "how long is this"
+            // has a visible answer instead of just a number.
+            if (started) {
+                val progress = (beatPosition / CALIBRATE_TOTAL_BEATS).coerceIn(0.0, 1.0).toFloat()
+                drawArc(
+                    color = Color(0xFF2FBF9E),
+                    startAngle = -90f,
+                    sweepAngle = progress * 360f,
+                    useCenter = false,
+                    topLeft = Offset(stageCenter.x - radius + 3f, stageCenter.y - radius + 3f),
+                    size = Size((radius - 3f) * 2f, (radius - 3f) * 2f),
+                    style = Stroke(width = 5f),
+                )
             }
 
-            Spacer(Modifier.height(4.dp))
+            // Anticipatory sweep: one full revolution per beat, arriving at the target
+            // mark (12 o'clock) exactly when the click plays.
+            val phase = if (beatPosition < 0) 0.0 else beatPosition - floor(beatPosition)
+            val angle = (-90f + phase.toFloat() * 360f) * (PI.toFloat() / 180f)
+            val marker = Offset(stageCenter.x + safeRadius * cos(angle), stageCenter.y + safeRadius * sin(angle))
+            if (started && !finished) {
+                drawLine(Color(0xFFFFB320), stageCenter, marker, strokeWidth = 4f)
+                drawCircle(Color(0xFFFFB320), radius = 8f, center = marker)
+            }
 
+            // Target mark flashes exactly on the beat, giving a second, reactive confirmation.
+            val target = Offset(stageCenter.x, stageCenter.y - safeRadius)
+            drawCircle(Color.White, radius = 10f + 16f * flashPhase, center = target, alpha = 0.20f + 0.55f * flashPhase)
+            drawCircle(Color.White, radius = 6f, center = target)
+        }
+
+        HudChip(modifier = Modifier.align(Alignment.TopStart).padding(16.dp)) {
+            HudText("Calibrate", color = Color(0xFF2FBF9E))
+        }
+
+        Column(
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
             when {
                 result != null -> {
                     val r = result!!
-                    Text(
-                        if (r.ok) "Offset set: ${formatMs(r.offsetMs)}" else "Not enough taps — try again",
-                        color = Color.White,
-                    )
-                    Text("from ${r.tapCount} taps", color = Color(0xFFAAB8B5))
-                    Text("Tap to try again", color = Color(0xFFAAB8B5))
+                    HudChip {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            HudText(
+                                if (r.ok) "Offset set: ${formatMs(r.offsetMs)}" else "Not enough taps — try again",
+                                loud = true,
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            HudText("from ${r.tapCount} taps", color = Color(0xFFAAB8B5))
+                            HudText("Tap to try again", color = Color(0xFFAAB8B5))
+                        }
+                    }
                 }
                 !started -> {
-                    Text("Tap to start", color = Color.White)
-                    Text(
-                        "$CALIBRATE_TOTAL_BEATS beats, about ${runLengthSeconds}s — a $CALIBRATE_COUNT_IN_BEATS-beat " +
-                            "count-in, then tap every beat",
-                        color = Color(0xFFAAB8B5),
-                    )
+                    HudChip {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            HudText("Tap to start", loud = true)
+                            Spacer(Modifier.height(2.dp))
+                            HudText(
+                                "$CALIBRATE_TOTAL_BEATS beats, about ${runLengthSeconds}s — a $CALIBRATE_COUNT_IN_BEATS-beat " +
+                                    "count-in, then tap every beat",
+                                color = Color(0xFFAAB8B5),
+                            )
+                        }
+                    }
                 }
                 else -> {
                     val beatIndex = floor(beatPosition).toInt()
-                    if (beatIndex < CALIBRATE_COUNT_IN_BEATS) {
-                        Text("Get ready…", color = Color.White)
-                    } else {
-                        Text("Tap with the click", color = Color.White)
+                    HudChip {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            HudText(if (beatIndex < CALIBRATE_COUNT_IN_BEATS) "Get ready…" else "Tap with the click", loud = true)
+                            Spacer(Modifier.height(2.dp))
+                            val shownBeat = beatIndex.coerceIn(0, CALIBRATE_TOTAL_BEATS)
+                            HudText("Beat $shownBeat of $CALIBRATE_TOTAL_BEATS  ·  $tapCount taps", color = Color(0xFFAAB8B5))
+                        }
                     }
-                    val shownBeat = beatIndex.coerceIn(0, CALIBRATE_TOTAL_BEATS)
-                    Text("Beat $shownBeat of $CALIBRATE_TOTAL_BEATS  ·  $tapCount taps", color = Color(0xFFAAB8B5))
-                    Spacer(Modifier.height(6.dp))
+                    Spacer(Modifier.height(8.dp))
                     TimingStrip(recentErrors)
                 }
             }
@@ -248,8 +256,8 @@ private fun TimingStrip(errors: List<Double>) {
         }
     }
     Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.width(width)) {
-        Text("early", color = Color(0xFF6E827D))
-        Text("late", color = Color(0xFF6E827D))
+        HudText("early", color = Color(0xFF9FB0AC))
+        HudText("late", color = Color(0xFF9FB0AC))
     }
 }
 

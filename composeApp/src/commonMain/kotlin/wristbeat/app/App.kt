@@ -1,17 +1,16 @@
 package wristbeat.app
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -19,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
@@ -30,47 +30,64 @@ enum class Stage(val label: String, val enabled: Boolean) {
     MANGO_CHOP("Mango Chop", enabled = false),
 }
 
+/**
+ * No app chrome: each stage owns the whole screen and draws its own title/HUD. The only shared UI
+ * is a small tab strip for switching stages, floated over the game in a corner like an in-game menu
+ * rather than sitting in a page header above the content.
+ */
 @Composable
 fun App() {
     var stage by remember { mutableStateOf(Stage.CALIBRATE) }
 
     MaterialTheme {
-        Column(
-            modifier = Modifier.fillMaxSize().background(Color(0xFF0F1B19)),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Spacer(Modifier.height(20.dp))
-            Text("Wristbeat", color = Color.White, style = MaterialTheme.typography.headlineMedium)
-            Spacer(Modifier.height(12.dp))
-            StagePicker(stage) { stage = it }
-            Spacer(Modifier.height(12.dp))
-            Box(
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-                contentAlignment = Alignment.Center,
-            ) {
-                when (stage) {
-                    Stage.CALIBRATE -> CalibrateScreen()
-                    Stage.SNAP_CRABS -> SnapCrabsScreen()
-                    Stage.MANGO_CHOP -> ComingSoon(Stage.MANGO_CHOP.label)
-                }
+        Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0F1B19))) {
+            when (stage) {
+                Stage.CALIBRATE -> CalibrateScreen()
+                Stage.SNAP_CRABS -> SnapCrabsScreen()
+                Stage.MANGO_CHOP -> ComingSoonScreen(Stage.MANGO_CHOP.label)
             }
+            StageTabs(
+                current = stage,
+                onSelect = { stage = it },
+                modifier = Modifier.align(Alignment.TopEnd).padding(16.dp),
+            )
         }
     }
 }
 
 @Composable
-private fun StagePicker(current: Stage, onSelect: (Stage) -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+private fun StageTabs(current: Stage, onSelect: (Stage) -> Unit, modifier: Modifier = Modifier) {
+    Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         for (s in Stage.entries) {
-            OutlinedButton(onClick = { onSelect(s) }, enabled = s.enabled) {
-                Text(if (s.enabled) s.label else "${s.label} (soon)")
+            val selected = s == current
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(if (selected) Color(0xFF2FBF9E) else Color.Black.copy(alpha = 0.38f))
+                    .border(
+                        width = 1.dp,
+                        color = if (selected) Color(0xFF2FBF9E) else Color.White.copy(alpha = 0.22f),
+                        shape = RoundedCornerShape(50),
+                    )
+                    .clickable(
+                        enabled = s.enabled,
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) { onSelect(s) }
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+            ) {
+                HudText(
+                    text = if (s.enabled) s.label else "${s.label} · soon",
+                    color = if (selected) Color(0xFF06211D) else Color.White.copy(alpha = if (s.enabled) 0.9f else 0.4f),
+                )
             }
         }
     }
-    Spacer(Modifier.height(if (current == Stage.CALIBRATE) 0.dp else 0.dp))
 }
 
 @Composable
-private fun ComingSoon(name: String) {
-    Text("$name — coming in a later iteration", color = Color(0xFFAAB8B5))
+private fun ComingSoonScreen(name: String) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        HudText("$name — coming in a later iteration", color = Color(0xFFAAB8B5))
+    }
 }

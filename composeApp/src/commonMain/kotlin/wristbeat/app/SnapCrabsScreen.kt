@@ -5,17 +5,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -161,70 +159,72 @@ fun SnapCrabsScreen() {
         tally = stage.tally()
     }
 
-    BoxWithConstraints(
+    // A single full-bleed canvas with the legend/status floated on top as a HUD overlay — no
+    // header/footer flow layout, so the beach and crabs always fill the whole screen edge to edge.
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .then(rememberTapKeyModifier(::handleTap))
             .pointerInput(Unit) { detectTapGestures { handleTap() } },
-        contentAlignment = Alignment.Center,
     ) {
-        // Reserve room below the stage for the legend + status text (same fix as CalibrateScreen).
-        val textReserve = 180.dp
-        val availableHeight = (maxHeight - textReserve).coerceAtLeast(120.dp)
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val squareExtent = minOf(size.width, size.height)
+            val squareLeft = (size.width - squareExtent) / 2f
+            val squareTop = (size.height - squareExtent) / 2f
+            fun sx(fraction: Float) = squareLeft + fraction * squareExtent
+            fun sy(fraction: Float) = squareTop + fraction * squareExtent
 
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            // The beach bleeds to fill the whole available width; the crabs and note highway stay
-            // centered in whatever square fits, same fullscreen-desktop treatment as CalibrateScreen.
-            Canvas(modifier = Modifier.fillMaxWidth().height(availableHeight)) {
-                val squareExtent = minOf(size.width, size.height)
-                val squareLeft = (size.width - squareExtent) / 2f
-                val squareTop = (size.height - squareExtent) / 2f
-                fun sx(fraction: Float) = squareLeft + fraction * squareExtent
-                fun sy(fraction: Float) = squareTop + fraction * squareExtent
+            drawBeachBackground(size.width, size.height, beatPosition)
 
-                drawBeachBackground(size.width, size.height, beatPosition)
+            drawNoteHighway(
+                leadCues = stage.leadCues,
+                targets = stage.targets,
+                beatPosition = beatPosition,
+                lookaheadBeats = 2.5,
+                hitFlash = maxOf(beatFlashPhase * 0.5f, targetPulsePhase),
+                laneY = sy(0.32f),
+                laneLeftX = sx(0.20f),
+                laneRightX = sx(0.92f),
+            )
 
-                drawNoteHighway(
-                    leadCues = stage.leadCues,
-                    targets = stage.targets,
-                    beatPosition = beatPosition,
-                    lookaheadBeats = 2.5,
-                    hitFlash = maxOf(beatFlashPhase * 0.5f, targetPulsePhase),
-                    laneY = sy(0.32f),
-                    laneLeftX = sx(0.20f),
-                    laneRightX = sx(0.92f),
-                )
+            val bodyRadius = squareExtent * 0.13f
+            val crabScale = bodyRadius / 46f
+            val bob = beatBob(beatPosition) * bodyRadius * 0.16f
+            drawCrab(
+                pos = Offset(sx(0.28f), sy(0.66f)),
+                scale = crabScale,
+                bodyColor = Color(0xFFDE4636),
+                darkColor = Color(0xFF7A1F18),
+                pulsePhase = leadPulsePhase,
+                bob = bob,
+                hasHat = true,
+            )
+            drawCrab(
+                pos = Offset(sx(0.72f), sy(0.66f)),
+                scale = crabScale,
+                bodyColor = Color(0xFF3F82D8),
+                darkColor = Color(0xFF173E73),
+                pulsePhase = playerPulsePhase,
+                bob = bob,
+                hasHat = false,
+            )
+        }
 
-                val bodyRadius = squareExtent * 0.13f
-                val crabScale = bodyRadius / 46f
-                val bob = beatBob(beatPosition) * bodyRadius * 0.16f
-                drawCrab(
-                    pos = Offset(sx(0.28f), sy(0.66f)),
-                    scale = crabScale,
-                    bodyColor = Color(0xFFDE4636),
-                    darkColor = Color(0xFF7A1F18),
-                    pulsePhase = leadPulsePhase,
-                    bob = bob,
-                    hasHat = true,
-                )
-                drawCrab(
-                    pos = Offset(sx(0.72f), sy(0.66f)),
-                    scale = crabScale,
-                    bodyColor = Color(0xFF3F82D8),
-                    darkColor = Color(0xFF173E73),
-                    pulsePhase = playerPulsePhase,
-                    bob = bob,
-                    hasHat = false,
-                )
-            }
+        HudChip(modifier = Modifier.align(Alignment.TopStart).padding(16.dp)) {
+            HudText("Snap Crabs", color = Color(0xFF2FBF9E))
+        }
 
-            Spacer(Modifier.height(4.dp))
+        HudChip(modifier = Modifier.align(Alignment.TopCenter).padding(top = 16.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 LegendDot(Color(0xFFDE4636), "Call")
                 LegendDot(Color(0xFF6FB6FF), "Your tap")
             }
-            Spacer(Modifier.height(4.dp))
+        }
 
+        Column(
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
             when {
                 finished -> {
                     val rank = when (tally.rank) {
@@ -232,27 +232,42 @@ fun SnapCrabsScreen() {
                         Rank.OK -> "OK"
                         Rank.TRY_AGAIN -> "Try again"
                     }
-                    Text(rank, color = Color.White)
-                    Text(
-                        "Perfect ${tally.perfect} · OK ${tally.ok} · Miss ${tally.miss}",
-                        color = Color(0xFFAAB8B5),
-                    )
-                    Text("Tap to try again", color = Color(0xFFAAB8B5))
+                    HudChip {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            HudText(rank, loud = true)
+                            Spacer(Modifier.height(2.dp))
+                            HudText(
+                                "Perfect ${tally.perfect} · OK ${tally.ok} · Miss ${tally.miss}",
+                                color = Color(0xFFAAB8B5),
+                            )
+                            HudText("Tap to try again", color = Color(0xFFAAB8B5))
+                        }
+                    }
                 }
                 !started -> {
-                    Text("Tap to start", color = Color.White)
-                    Text(
-                        "Watch the lead crab snap a pattern, then repeat it one bar later " +
-                            "(~${runLengthSeconds}s)",
-                        color = Color(0xFFAAB8B5),
-                    )
+                    HudChip {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            HudText("Tap to start", loud = true)
+                            Spacer(Modifier.height(2.dp))
+                            HudText(
+                                "Watch the lead crab snap a pattern, then repeat it one bar later " +
+                                    "(~${runLengthSeconds}s)",
+                                color = Color(0xFFAAB8B5),
+                            )
+                        }
+                    }
                 }
                 else -> {
-                    Text(sectionLabel(beatPosition), color = Color.White)
-                    Text(
-                        "Perfect ${tally.perfect} · OK ${tally.ok} · Miss ${tally.miss}",
-                        color = Color(0xFFAAB8B5),
-                    )
+                    HudChip {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            HudText(sectionLabel(beatPosition), loud = true)
+                            Spacer(Modifier.height(2.dp))
+                            HudText(
+                                "Perfect ${tally.perfect} · OK ${tally.ok} · Miss ${tally.miss}",
+                                color = Color(0xFFAAB8B5),
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -397,7 +412,7 @@ private fun LegendDot(color: Color, label: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(modifier = Modifier.size(8.dp).background(color, CircleShape))
         Spacer(Modifier.width(6.dp))
-        Text(label, color = Color(0xFFAAB8B5))
+        HudText(label, color = Color(0xFFAAB8B5))
     }
 }
 
