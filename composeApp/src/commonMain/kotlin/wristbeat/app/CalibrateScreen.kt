@@ -137,7 +137,11 @@ fun CalibrateScreen() {
             .pointerInput(Unit) { detectTapGestures { handleTap() } },
         contentAlignment = Alignment.Center,
     ) {
-        val diameter = if (maxWidth < maxHeight) maxWidth else maxHeight
+        // Reserve room below the circle for the status text so it can never get pushed off-screen
+        // (the circle alone would otherwise happily fill 100% of a wide, short viewport).
+        val textReserve = 150.dp
+        val availableHeight = (maxHeight - textReserve).coerceAtLeast(120.dp)
+        val diameter = if (maxWidth < availableHeight) maxWidth else availableHeight
 
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Canvas(modifier = Modifier.size(diameter)) {
