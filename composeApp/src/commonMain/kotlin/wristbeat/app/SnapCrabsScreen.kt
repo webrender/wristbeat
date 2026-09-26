@@ -25,17 +25,23 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.floor
+import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.math.sin
 import wristbeat.core.Grade
@@ -176,14 +182,7 @@ fun SnapCrabsScreen() {
                 fun sx(fraction: Float) = squareLeft + fraction * squareExtent
                 fun sy(fraction: Float) = squareTop + fraction * squareExtent
 
-                drawBeachBackground(size.width, size.height)
-                // A translucent panel behind the stage keeps the highway and crabs legible over the scenery.
-                drawRoundRect(
-                    color = Color.Black.copy(alpha = 0.18f),
-                    topLeft = Offset(squareLeft, squareTop),
-                    size = Size(squareExtent, squareExtent),
-                    cornerRadius = CornerRadius(squareExtent * 0.06f),
-                )
+                drawBeachBackground(size.width, size.height, beatPosition)
 
                 drawNoteHighway(
                     leadCues = stage.leadCues,
@@ -197,8 +196,26 @@ fun SnapCrabsScreen() {
                 )
 
                 val bodyRadius = squareExtent * 0.13f
-                drawCrab(Offset(sx(0.28f), sy(0.66f)), bodyRadius, Color(0xFFDE4636), leadPulsePhase)
-                drawCrab(Offset(sx(0.72f), sy(0.66f)), bodyRadius, Color(0xFF3F82D8), playerPulsePhase)
+                val crabScale = bodyRadius / 46f
+                val bob = beatBob(beatPosition) * bodyRadius * 0.16f
+                drawCrab(
+                    pos = Offset(sx(0.28f), sy(0.66f)),
+                    scale = crabScale,
+                    bodyColor = Color(0xFFDE4636),
+                    darkColor = Color(0xFF7A1F18),
+                    pulsePhase = leadPulsePhase,
+                    bob = bob,
+                    hasHat = true,
+                )
+                drawCrab(
+                    pos = Offset(sx(0.72f), sy(0.66f)),
+                    scale = crabScale,
+                    bodyColor = Color(0xFF3F82D8),
+                    darkColor = Color(0xFF173E73),
+                    pulsePhase = playerPulsePhase,
+                    bob = bob,
+                    hasHat = false,
+                )
             }
 
             Spacer(Modifier.height(4.dp))
@@ -267,6 +284,24 @@ private fun DrawScope.drawNoteHighway(
     val leadRowY = laneY - rowGap
     val targetRowY = laneY + rowGap
 
+    // A HUD ribbon behind just the highway (not the whole stage) keeps the lanes legible over the
+    // beach without covering it in a web-card rectangle.
+    val padding = (laneRightX - laneLeftX) * 0.05f
+    drawRect(
+        brush = Brush.horizontalGradient(
+            colors = listOf(
+                Color.Transparent,
+                Color.Black.copy(alpha = 0.32f),
+                Color.Black.copy(alpha = 0.32f),
+                Color.Transparent,
+            ),
+            startX = laneLeftX - padding,
+            endX = laneRightX + padding,
+        ),
+        topLeft = Offset(laneLeftX - padding, leadRowY - rowGap * 1.3f),
+        size = Size((laneRightX - laneLeftX) + padding * 2f, rowGap * 2.6f),
+    )
+
     drawLine(Color.White.copy(alpha = 0.08f), Offset(laneLeftX, leadRowY), Offset(laneRightX, leadRowY), strokeWidth = 2f)
     drawLine(Color.White.copy(alpha = 0.12f), Offset(laneLeftX, targetRowY), Offset(laneRightX, targetRowY), strokeWidth = 2f)
 
@@ -296,23 +331,59 @@ private fun DrawScope.drawNoteHighway(
     }
 }
 
-/** A flat-shape beach scene (sky, sun, water, sand) that bleeds to fill the whole canvas, per HANDOFF's "extended background" note. */
-private fun DrawScope.drawBeachBackground(w: Float, h: Float) {
+/**
+ * A beach scene (sky, sun, animated water, foam line, sand) that bleeds to fill the whole canvas,
+ * per HANDOFF's "extended background" note. Ported from the prototype's drawBeach, including the
+ * scrolling wave strokes, so the scenery reads as game art instead of flat CSS-gradient rectangles.
+ */
+private fun DrawScope.drawBeachBackground(w: Float, h: Float, beatPosition: Double) {
     val horizon = h * 0.42f
     drawRect(
         brush = Brush.verticalGradient(colors = listOf(Color(0xFFFF8E64), Color(0xFFFFD49A)), startY = 0f, endY = horizon),
         size = Size(w, horizon),
     )
-    drawCircle(Color(0xFFFFF1C4), radius = h * 0.09f, center = Offset(w * 0.84f, h * 0.15f))
+    drawCircle(
+        brush = Brush.radialGradient(
+            colors = listOf(Color(0xFFFFF6DE), Color(0xFFFFF1C4).copy(alpha = 0f)),
+            center = Offset(w * 0.84f, h * 0.15f),
+            radius = h * 0.16f,
+        ),
+        radius = h * 0.16f,
+        center = Offset(w * 0.84f, h * 0.15f),
+    )
+    drawCircle(Color(0xFFFFF1C4), radius = h * 0.08f, center = Offset(w * 0.84f, h * 0.15f))
+
     val waterHeight = h * 0.07f
     drawRect(color = Color(0xFF2E9C9A), topLeft = Offset(0f, horizon), size = Size(w, waterHeight))
-    drawRect(
-        color = Color(0xFF3AB0AC),
-        topLeft = Offset(0f, horizon),
-        size = Size(w, waterHeight * 0.35f),
-    )
+    drawRect(color = Color(0xFF3AB0AC), topLeft = Offset(0f, horizon), size = Size(w, waterHeight * 0.35f))
+
+    // Wave strokes scroll with beat position, matching the prototype's shift = (beat % 2) * 20.
+    val beat = beatPosition.coerceAtLeast(0.0)
+    val shift = ((beat % 2.0) / 2.0 * (w * 0.09)).toFloat()
+    val waveStroke = Stroke(width = 3f, cap = StrokeCap.Round)
+    for (row in 0 until 2) {
+        val y = horizon + waterHeight * (0.42f + row * 0.34f)
+        var x = -w * 0.12f + shift + row * w * 0.045f
+        while (x < w + w * 0.12f) {
+            drawLine(
+                Color.White.copy(alpha = 0.5f),
+                Offset(x, y),
+                Offset(x + w * 0.05f, y),
+                strokeWidth = waveStroke.width,
+                cap = waveStroke.cap,
+            )
+            x += w * 0.14f
+        }
+    }
+
     val sandTop = horizon + waterHeight
     drawRect(color = Color(0xFFF3D29C), topLeft = Offset(0f, sandTop), size = Size(w, h - sandTop))
+    // Foam line where the water meets the sand.
+    drawOval(
+        color = Color(0xFFFBE2B6).copy(alpha = 0.85f),
+        topLeft = Offset(-w * 0.1f, sandTop - h * 0.01f),
+        size = Size(w * 1.2f, h * 0.018f),
+    )
     val sandHeight = h - sandTop
     for (i in 0 until 70) {
         val fx = (i * 53 % 977) / 977f
@@ -330,15 +401,114 @@ private fun LegendDot(color: Color, label: String) {
     }
 }
 
-/** A simplified crab: a body circle with two claw lines that swing open on [pulsePhase] (0 = closed, 1 = snapped). */
-private fun DrawScope.drawCrab(pos: Offset, bodyRadius: Float, color: Color, pulsePhase: Float) {
-    val spread = (18f + pulsePhase * 55f) * (PI.toFloat() / 180f)
-    val clawLen = bodyRadius * 1.4f
-    for (side in listOf(-1f, 1f)) {
-        val angle = -PI.toFloat() / 2f + side * (0.35f + spread)
-        val clawEnd = Offset(pos.x + clawLen * cos(angle), pos.y + clawLen * sin(angle))
-        drawLine(color, pos, clawEnd, strokeWidth = bodyRadius * 0.28f)
-        drawCircle(color, radius = bodyRadius * 0.22f, center = clawEnd)
+/** Beat-synced bounce: peaks right after the beat and eases out, ported from the prototype's beatBob. */
+private fun beatBob(beat: Double): Float {
+    if (beat < 0) return 0f
+    val f = beat - floor(beat)
+    return (1f - f.toFloat()).pow(3)
+}
+
+/**
+ * A fully-articulated crab (legs, claws that snap shut on [pulsePhase], eye stalks, optional hat)
+ * drawn in local coordinates matching the prototype's drawCrab, then scaled/positioned to fit the
+ * stage. This replaces the earlier placeholder body-circle-with-two-lines shape.
+ */
+private fun DrawScope.drawCrab(
+    pos: Offset,
+    scale: Float,
+    bodyColor: Color,
+    darkColor: Color,
+    pulsePhase: Float,
+    bob: Float,
+    hasHat: Boolean,
+) {
+    withTransform({
+        translate(pos.x, pos.y + bob)
+        scale(scale, scale, Offset.Zero)
+    }) {
+        drawOval(
+            color = Color.Black.copy(alpha = 0.16f),
+            topLeft = Offset(-42f, 36f),
+            size = Size(84f, 16f),
+        )
+
+        val legStroke = Stroke(width = 6f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        for (side in listOf(-1f, 1f)) {
+            for (i in 0 until 3) {
+                val leg = Path().apply {
+                    moveTo(side * 28f, 6f + i * 6f)
+                    lineTo(side * (48f + i * 3f), 12f + i * 8f)
+                    lineTo(side * (54f + i * 4f), 30f + i * 6f)
+                }
+                drawPath(leg, darkColor, style = legStroke)
+            }
+        }
+
+        for (side in listOf(-1f, 1f)) {
+            val ax = side * (58f + pulsePhase * 4f)
+            val ay = -30f - pulsePhase * 26f
+            val arm = Path().apply {
+                moveTo(side * 34f, -6f)
+                quadraticTo(side * 56f, -6f, ax, ay + 12f)
+            }
+            drawPath(arm, darkColor, style = Stroke(width = 7f, cap = StrokeCap.Round))
+
+            val open = 0.6f * (1f - pulsePhase) + 0.05f
+            val dir = -PI.toFloat() / 2f + side * 0.45f
+            val startAngle = dir + open
+            val sweep = 2f * PI.toFloat() - 2f * open
+            val clawRadius = 18f
+            val claw = Path().apply {
+                moveTo(ax, ay)
+                lineTo(ax + clawRadius * cos(startAngle), ay + clawRadius * sin(startAngle))
+                arcTo(
+                    rect = Rect(ax - clawRadius, ay - clawRadius, ax + clawRadius, ay + clawRadius),
+                    startAngleDegrees = startAngle * 180f / PI.toFloat(),
+                    sweepAngleDegrees = sweep * 180f / PI.toFloat(),
+                    forceMoveTo = false,
+                )
+                close()
+            }
+            drawPath(claw, bodyColor)
+            drawPath(claw, darkColor, style = Stroke(width = 3f))
+        }
+
+        for (side in listOf(-1f, 1f)) {
+            drawLine(darkColor, Offset(side * 12f, -22f), Offset(side * 16f, -46f), strokeWidth = 5f, cap = StrokeCap.Round)
+        }
+
+        drawOval(bodyColor, topLeft = Offset(-46f, -30f), size = Size(92f, 60f))
+        drawOval(darkColor, topLeft = Offset(-46f, -30f), size = Size(92f, 60f), style = Stroke(width = 3f))
+        drawOval(Color.White.copy(alpha = 0.28f), topLeft = Offset(-29f, -24f), size = Size(30f, 14f))
+
+        for (side in listOf(-1f, 1f)) {
+            drawCircle(Color.White, radius = 10f, center = Offset(side * 16f, -50f))
+            drawCircle(darkColor, radius = 10f, center = Offset(side * 16f, -50f), style = Stroke(width = 2.5f))
+            drawCircle(Color(0xFF1A2927), radius = 4.5f, center = Offset(side * 16f, -49f))
+        }
+
+        drawArc(
+            color = darkColor,
+            startAngle = 36f,
+            sweepAngle = 108f,
+            useCenter = false,
+            topLeft = Offset(-7f, -15f),
+            size = Size(14f, 14f),
+            style = Stroke(width = 3f, cap = StrokeCap.Round),
+        )
+
+        if (hasHat) {
+            drawArc(
+                color = Color(0xFFF0C565),
+                startAngle = 180f,
+                sweepAngle = 180f,
+                useCenter = true,
+                topLeft = Offset(-22f, -81f),
+                size = Size(44f, 34f),
+            )
+            drawRect(Color(0xFF1F7A7A), topLeft = Offset(-22f, -70f), size = Size(44f, 6f))
+            drawOval(Color(0xFFF0C565), topLeft = Offset(-40f, -67f), size = Size(80f, 8f))
+            drawOval(Color(0xFFC99A3E), topLeft = Offset(-40f, -67f), size = Size(80f, 8f), style = Stroke(width = 2f))
+        }
     }
-    drawCircle(color, radius = bodyRadius, center = pos)
 }
