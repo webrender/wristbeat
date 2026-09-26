@@ -22,8 +22,14 @@ data class TapOutcome(val grade: Grade?, val errorMs: Double)
  * Snap Crabs: the lead crab snaps a pattern in bar N, the player repeats it in bar N+1.
  * A tap is matched to the nearest un-judged target beat, then graded by [judge]; a tap that lands
  * outside the OK window (or with no target left nearby) is a stray and consumes nothing.
+ *
+ * [inputOffsetMs] is Calibrate's measured offset (positive = the player's taps land late). It's
+ * subtracted from every tap and miss check, so a consistently late or early player is judged
+ * against where they actually hear the beat rather than the raw audio clock.
  */
-class SnapCrabsStage {
+class SnapCrabsStage(inputOffsetMs: Double = 0.0) {
+    private val offsetBeats = inputOffsetMs / 1000.0 / SECONDS_PER_BEAT
+
     val end = SNAP_CRABS_END_BEATS
     val chart: List<ChartEvent>
     val leadCues: List<Double>
@@ -53,7 +59,8 @@ class SnapCrabsStage {
     private var miss = 0
 
     /** Matches [beat] to the nearest un-judged target and grades it. Null means a stray tap (no grade, nothing consumed). */
-    fun recordTap(beat: Double): TapOutcome? {
+    fun recordTap(rawBeat: Double): TapOutcome? {
+        val beat = rawBeat - offsetBeats
         var bestIndex = -1
         var bestDelta = Double.MAX_VALUE
         for (i in targets.indices) {
@@ -73,7 +80,8 @@ class SnapCrabsStage {
     }
 
     /** Marks any un-judged target whose OK window has fully passed as a miss. Call once per frame. */
-    fun updateMisses(currentBeat: Double) {
+    fun updateMisses(rawBeat: Double) {
+        val currentBeat = rawBeat - offsetBeats
         for (i in targets.indices) {
             if (!judged[i] && isMissed(currentBeat, targets[i])) {
                 judged[i] = true

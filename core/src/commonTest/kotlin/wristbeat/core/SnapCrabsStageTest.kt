@@ -46,4 +46,21 @@ class SnapCrabsStageTest {
         assertEquals(stage.targets.size, stage.tally().perfect)
         assertEquals(Rank.SUPERB, stage.tally().rank)
     }
+
+    @Test fun calibratedOffsetShiftsJudgment() {
+        val stage = SnapCrabsStage(inputOffsetMs = 80.0)
+        val target = stage.targets.first()
+        val eightyMsLate = target + 0.080 / SECONDS_PER_BEAT
+        val outcome = stage.recordTap(eightyMsLate)
+        assertEquals(Grade.PERFECT, outcome?.grade)
+        assertEquals(0.0, outcome!!.errorMs, 0.001)
+    }
+
+    @Test fun calibratedOffsetDelaysMisses() {
+        val stage = SnapCrabsStage(inputOffsetMs = 80.0)
+        val target = stage.targets.first()
+        val justPastRawWindow = target + (OK_WINDOW_MS / 1000.0 + 0.001) / SECONDS_PER_BEAT
+        stage.updateMisses(justPastRawWindow)
+        assertEquals(0, stage.tally().miss)
+    }
 }

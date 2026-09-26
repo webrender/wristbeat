@@ -53,7 +53,7 @@ import wristbeat.core.SECONDS_PER_BEAT
  * each beat so the player can anticipate a click instead of only reacting to a flash after it lands.
  */
 @Composable
-fun CalibrateScreen() {
+fun CalibrateScreen(onCalibrated: (offsetMs: Double) -> Unit) {
     val audioClock = remember { AudioClock() }
     val audioEngine = remember { AudioEngine() }
     val haptics = remember { HapticEngine() }
@@ -101,7 +101,9 @@ fun CalibrateScreen() {
             flashPhase = (flashPhase - dt * 4f).coerceAtLeast(0f)
 
             if (beat >= CALIBRATE_TOTAL_BEATS && result == null) {
-                result = stage.finish()
+                val r = stage.finish()
+                result = r
+                if (r.ok) onCalibrated(r.offsetMs)
                 finished = true
             }
         }
@@ -286,7 +288,7 @@ private fun DrawScope.drawCalibrateBackground(w: Float, h: Float, glowCenter: Of
     }
 }
 
-private fun formatMs(v: Double): String {
+internal fun formatMs(v: Double): String {
     val sign = if (v >= 0) "+" else "−"
     return "$sign${round(abs(v)).toInt()}ms"
 }

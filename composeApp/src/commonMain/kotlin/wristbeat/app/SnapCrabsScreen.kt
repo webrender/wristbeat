@@ -60,11 +60,11 @@ private const val CYCLE_BEATS = 8.0
  * of time, not just reacted to after the fact.
  */
 @Composable
-fun SnapCrabsScreen() {
+fun SnapCrabsScreen(inputOffsetMs: Double) {
     val audioClock = remember { AudioClock() }
     val audioEngine = remember { AudioEngine() }
     val haptics = remember { HapticEngine() }
-    val stage = remember { SnapCrabsStage() }
+    var stage by remember { mutableStateOf(SnapCrabsStage(inputOffsetMs)) }
 
     var started by remember { mutableStateOf(false) }
     var finished by remember { mutableStateOf(false) }
@@ -130,6 +130,8 @@ fun SnapCrabsScreen() {
     fun handleTap() {
         if (!started) {
             audioClock.start()
+            // Fresh stage per run: judged targets and the tally don't carry over into a replay.
+            stage = SnapCrabsStage(inputOffsetMs)
             t0 = audioClock.now() + 0.3
             scheduledIndex = 0
             lastFiredBeat = -1
@@ -259,6 +261,10 @@ fun SnapCrabsScreen() {
                             HudText(
                                 "Watch the lead crab snap a pattern, then repeat it one bar later " +
                                     "(~${runLengthSeconds}s)",
+                                color = Color(0xFFAAB8B5),
+                            )
+                            HudText(
+                                if (inputOffsetMs == 0.0) "Not calibrated" else "Calibrated offset ${formatMs(inputOffsetMs)}",
                                 color = Color(0xFFAAB8B5),
                             )
                         }

@@ -33,12 +33,15 @@ enum class Stage(val label: String, val enabled: Boolean) {
 @Composable
 fun App() {
     var stage by remember { mutableStateOf(Stage.CALIBRATE) }
+    // Calibrate's measured tap offset, applied when judging Snap Crabs. In-memory only for now —
+    // per-device storage isn't built yet, so it resets when the app restarts.
+    var inputOffsetMs by remember { mutableStateOf(0.0) }
 
     MaterialTheme {
         Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0F1B19))) {
             when (stage) {
-                Stage.CALIBRATE -> CalibrateScreen()
-                Stage.SNAP_CRABS -> SnapCrabsScreen()
+                Stage.CALIBRATE -> CalibrateScreen(onCalibrated = { inputOffsetMs = it })
+                Stage.SNAP_CRABS -> SnapCrabsScreen(inputOffsetMs)
                 Stage.MANGO_CHOP -> ComingSoonScreen(Stage.MANGO_CHOP.label)
             }
             StageTabs(
