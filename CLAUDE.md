@@ -67,7 +67,7 @@ into the same timebase before judging, per HANDOFF's timing-accuracy requirement
   with a falling double whistle) land 2 beats later and need a **swipe** to slice. The wrong action
   is a stray: it consumes nothing, and the fruit bounces off as a miss if it isn't corrected in time.
   Its note highway shows each whistle on the top row and each landing on the bottom row (pineapples
-  as diamonds, since they're swiped), and hides with the same chart toggle.
+  as slanted swipe arrows, which the legend repeats), and hides with the same chart toggle.
 - **Input** — pointer/touch taps everywhere, plus Space/J/F/Enter on the keyboard
   (`InputHandling.kt`'s `rememberTapKeyModifier`), matching HANDOFF's documented web input mapping.
   Taps are judged when the finger **lands** (`detectTapGestures(onPress = …)`), not on release, so

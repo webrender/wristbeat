@@ -98,7 +98,7 @@ fun MangoChopScreen(inputOffsetMs: Double, chart: ChartSetting) {
     var tally by remember { mutableStateOf(ScoreTally()) }
     val runLengthSeconds = remember { (MANGO_CHOP_END_BEATS * secondsPerBeat).roundToInt() }
     // Highway: each toss's whistle on the cue row, and its landing (the beat to act on) on the
-    // target row. Pineapples are diamonds, since they take a swipe rather than a tap.
+    // target row. Pineapples are swipe arrows, since they take a swipe rather than a tap.
     val highwayCues = remember(stage) { stage.tosses.map { highwayNote(it.fruit, it.beat, cue = true) } }
     val highwayTargets = remember(stage) { stage.tosses.map { highwayNote(it.fruit, it.landBeat, cue = false) } }
 
@@ -274,7 +274,7 @@ fun MangoChopScreen(inputOffsetMs: Double, chart: ChartSetting) {
         StageHeader("Mango Chop", Color(0xFFFFB320), chart) {
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 LegendDot(Color(0xFFFFB320), "Tap: chop")
-                LegendDot(Color(0xFFE8A93A), "Swipe: slice")
+                LegendDot(Color(0xFFE8A93A), "Swipe: slice", NoteShape.SWIPE)
             }
         }
 
@@ -343,7 +343,7 @@ private fun highwayNote(fruit: Fruit, beat: Double, cue: Boolean): HighwayNote {
         Fruit.PINEAPPLE -> Color(0xFFE8A93A)
     }
     return when {
-        fruit == Fruit.PINEAPPLE -> HighwayNote(beat, if (cue) color.copy(alpha = 0.75f) else color, if (cue) 7f else 10f, NoteShape.DIAMOND)
+        fruit == Fruit.PINEAPPLE -> HighwayNote(beat, if (cue) color.copy(alpha = 0.75f) else color, if (cue) 7f else 10f, NoteShape.SWIPE)
         cue -> HighwayNote(beat, color.copy(alpha = 0.75f), 6f)
         else -> HighwayNote(beat, color, 8f)
     }

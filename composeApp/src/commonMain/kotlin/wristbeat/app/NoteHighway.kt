@@ -4,10 +4,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 
-internal enum class NoteShape { DOT, DIAMOND }
+/** [DOT] is a tap; [SWIPE] is a slanted arrow, so a swipe target can't be mistaken for a tap. */
+internal enum class NoteShape { DOT, SWIPE }
 
 /** One marker on a [drawNoteHighway] row, arriving at the hit line on [beat]. */
 internal data class HighwayNote(
@@ -73,19 +74,31 @@ internal fun DrawScope.drawNoteHighway(
             val x = laneLeftX + (until / lookaheadBeats).toFloat() * (laneRightX - laneLeftX)
             when (note.shape) {
                 NoteShape.DOT -> drawCircle(note.color, radius = note.radius, center = Offset(x, y))
-                NoteShape.DIAMOND -> drawPath(
-                    Path().apply {
-                        moveTo(x, y - note.radius)
-                        lineTo(x + note.radius, y)
-                        lineTo(x, y + note.radius)
-                        lineTo(x - note.radius, y)
-                        close()
-                    },
-                    note.color,
-                )
+                NoteShape.SWIPE -> drawSwipeMarker(Offset(x, y), note.radius, note.color)
             }
         }
     }
     drawRow(cues, cueRowY)
     drawRow(targets, targetRowY)
+}
+
+/**
+ * A swipe marker: a thick arrow slashing up and to the right, with a dark outline so it reads
+ * against both the highway ribbon and the dots around it, and doesn't look like a tap at a glance.
+ * [radius] is the half-size of its bounding box, matching a dot of the same radius.
+ */
+internal fun DrawScope.drawSwipeMarker(center: Offset, radius: Float, color: Color) {
+    val r = radius * 1.25f
+    val tail = Offset(center.x - r * 0.8f, center.y + r * 0.8f)
+    val tip = Offset(center.x + r * 0.8f, center.y - r * 0.8f)
+    // Arrowhead arms run back from the tip: one straight left, one straight down.
+    val headLeft = Offset(tip.x - r * 0.9f, tip.y)
+    val headDown = Offset(tip.x, tip.y + r * 0.9f)
+    val stroke = r * 0.42f
+    val outline = Color(0xFF2A1A08).copy(alpha = color.alpha)
+    for ((c, w) in listOf(outline to stroke + r * 0.3f, color to stroke)) {
+        drawLine(c, tail, tip, strokeWidth = w, cap = StrokeCap.Round)
+        drawLine(c, tip, headLeft, strokeWidth = w, cap = StrokeCap.Round)
+        drawLine(c, tip, headDown, strokeWidth = w, cap = StrokeCap.Round)
+    }
 }

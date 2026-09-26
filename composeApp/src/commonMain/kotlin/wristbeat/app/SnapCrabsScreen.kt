@@ -350,9 +350,13 @@ private fun DrawScope.drawBeachBackground(w: Float, h: Float, beatPosition: Doub
 }
 
 @Composable
-internal fun LegendDot(color: Color, label: String) {
+internal fun LegendDot(color: Color, label: String, shape: NoteShape = NoteShape.DOT) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(modifier = Modifier.size(8.dp).background(color, CircleShape))
+        when (shape) {
+            NoteShape.DOT -> Box(modifier = Modifier.size(8.dp).background(color, CircleShape))
+            // Drawn with the highway's own marker, so the legend matches what scrolls past.
+            NoteShape.SWIPE -> Canvas(Modifier.size(14.dp)) { drawSwipeMarker(center, size.minDimension * 0.4f, color) }
+        }
         Spacer(Modifier.width(6.dp))
         HudText(label, color = Color(0xFFAAB8B5))
     }
