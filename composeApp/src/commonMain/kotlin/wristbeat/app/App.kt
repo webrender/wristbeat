@@ -17,12 +17,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
-// Mango Chop is stubbed this iteration; Calibrate and Snap Crabs are playable.
 // Calibrate opens first by default per Jeremy's feedback on the prototype.
 enum class Stage(val label: String, val enabled: Boolean) {
     CALIBRATE("Calibrate", enabled = true),
     SNAP_CRABS("Snap Crabs", enabled = true),
-    MANGO_CHOP("Mango Chop", enabled = false),
+    MANGO_CHOP("Mango Chop", enabled = true),
 }
 
 /**
@@ -33,7 +32,7 @@ enum class Stage(val label: String, val enabled: Boolean) {
 @Composable
 fun App() {
     var stage by remember { mutableStateOf(Stage.CALIBRATE) }
-    // Calibrate's measured tap offset, applied when judging Snap Crabs. In-memory only for now —
+    // Calibrate's measured tap offset, applied when judging Snap Crabs and Mango Chop. In-memory only for now —
     // per-device storage isn't built yet, so it resets when the app restarts.
     var inputOffsetMs by remember { mutableStateOf(0.0) }
 
@@ -42,7 +41,7 @@ fun App() {
             when (stage) {
                 Stage.CALIBRATE -> CalibrateScreen(onCalibrated = { inputOffsetMs = it })
                 Stage.SNAP_CRABS -> SnapCrabsScreen(inputOffsetMs)
-                Stage.MANGO_CHOP -> ComingSoonScreen(Stage.MANGO_CHOP.label)
+                Stage.MANGO_CHOP -> MangoChopScreen(inputOffsetMs)
             }
             StageTabs(
                 current = stage,
@@ -69,12 +68,5 @@ private fun StageTabs(current: Stage, onSelect: (Stage) -> Unit, modifier: Modif
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun ComingSoonScreen(name: String) {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        HudText("$name — coming in a later iteration", color = Color(0xFFAAB8B5))
     }
 }

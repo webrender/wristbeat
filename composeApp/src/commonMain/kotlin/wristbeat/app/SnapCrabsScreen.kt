@@ -168,7 +168,9 @@ fun SnapCrabsScreen(inputOffsetMs: Double) {
         modifier = Modifier
             .fillMaxSize()
             .then(rememberTapKeyModifier(::handleTap))
-            .pointerInput(Unit) { detectTapGestures { handleTap() } },
+            // onPress, not onTap: judge when the finger lands, not when it lifts, so the offset
+            // Calibrate measures doesn't include how long each tap is held.
+            .pointerInput(Unit) { detectTapGestures(onPress = { handleTap() }) },
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val squareExtent = minOf(size.width, size.height)
@@ -432,7 +434,7 @@ private fun ChartToggle(on: Boolean, onToggle: () -> Unit) {
 }
 
 @Composable
-private fun LegendDot(color: Color, label: String) {
+internal fun LegendDot(color: Color, label: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(modifier = Modifier.size(8.dp).background(color, CircleShape))
         Spacer(Modifier.width(6.dp))

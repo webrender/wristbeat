@@ -5,7 +5,7 @@ art. `HANDOFF.md` is the original design brief Jeremy wrote before implementatio
 still useful for the *why* (hard requirements, scaling rules, input mapping, backlog), but treat it
 as historical intent, not current status. Some of it is already resolved (the architecture decision
 it asks you to make with Jeremy has been made — see below) and some of it hasn't been built yet
-(Android/Wear targets, a chart format/editor, Mango Chop). This file is the living status doc.
+(a chart format/editor, Wear-specific UI). This file is the living status doc.
 
 `wristbeat-prototype.html` is the original single-file HTML/Canvas/Web Audio prototype Jeremy built
 to try out the feel. It's a useful reference for art and sound design (e.g. `drawCrab`, `SND.bass`)
@@ -20,14 +20,16 @@ build and launch the shared `App()`), but their platform actuals are placeholder
 - **`core/`** — pure Kotlin, no UI framework, unit-tested (`core/src/commonTest`). Chart data,
   timing/judgment math, and the stage state machines live here so they can be shared and tested
   without a UI.
-  - `Timing.kt` — beat/clock constants (`SECONDS_PER_BEAT`, judgment windows).
+  - `Timing.kt` — beat/clock constants (`SECONDS_PER_BEAT` for the shared 116 BPM, `MANGO_CHOP_BPM`).
+    Charts are authored in beats; each stage exposes its own seconds-per-beat where it differs.
   - `Judgment.kt` — `Grade`, `ScoreTally`, `Rank` and the PERFECT/OK/miss math.
-  - `Chart.kt` — `SoundId`, `ChartEvent`, and `Charts` (procedural chart generators, e.g.
-    `snapCrabsBacking`).
-  - `CalibrateStage.kt`, `SnapCrabsStage.kt` — per-stage state machines (`recordTap`,
-    `updateMisses`, `tally`). Mango Chop doesn't have one yet — it's still a stub screen.
+  - `Chart.kt` — `SoundId`, `ChartEvent`, and `Charts` (procedural chart generators:
+    `snapCrabsBacking`, and `mangoChopBacking`, which is the same band plus a steel pan riff).
+  - `CalibrateStage.kt`, `SnapCrabsStage.kt`, `MangoChopStage.kt` — per-stage state machines
+    (`recordTap`/`recordAction`, `updateMisses`, `tally`).
 - **`composeApp/`** — the Compose UI and platform adapters.
   - `commonMain` — `App.kt` (stage switching), `CalibrateScreen.kt`, `SnapCrabsScreen.kt`,
+    `MangoChopScreen.kt`,
     `Hud.kt` (shared HUD text/chip styling), `InputHandling.kt` (keyboard tap support), and
     `expect` declarations for `AudioClock`/`AudioEngine`/`HapticEngine`.
   - `wasmJsMain` — the `actual` implementations: `AudioClock` wraps `AudioContext`'s output
@@ -57,10 +59,20 @@ into the same timebase before judging, per HANDOFF's timing-accuracy requirement
   a melody line) plays underneath, and there's a live Perfect/OK/Miss tally with a results screen.
   The note highway (the "visual beat indicator chart") can be toggled off via the `Chart: On/Off`
   button under the stage label, for playing by ear alone.
-- **Mango Chop** — stubbed (`enabled = false` in `App.kt`'s `Stage` enum), shows "coming in a later
-  iteration."
+- **Mango Chop** — playable at 132 BPM (faster than the other stages' 116), with a steel pan added
+  to the band. A whistle marks each toss: mangoes land 2 beats later and limes 1 beat later, and
+  both are chopped with a tap. Pineapples (introduced in the third section, tossed from the right
+  with a falling double whistle) land 2 beats later and need a **swipe** to slice. The wrong action
+  is a stray: it consumes nothing, and the fruit bounces off as a miss if it isn't corrected in time.
+  There's no note highway; the fruit arcs are the visual cue.
 - **Input** — pointer/touch taps everywhere, plus Space/J/F/Enter on the keyboard
   (`InputHandling.kt`'s `rememberTapKeyModifier`), matching HANDOFF's documented web input mapping.
+  Taps are judged when the finger **lands** (`detectTapGestures(onPress = …)`), not on release, so
+  Calibrate's offset doesn't include how long a tap is held and applies to every stage.
+  Mango Chop's swipe: on touch (and mouse drag) a swipe fires when the pointer moves 24dp. To avoid
+  delaying chops, a press chops immediately when the nearest open fruit wants a chop. When a
+  pineapple is nearest, the press waits: it slices if it becomes a swipe, and otherwise chops on
+  release, judged at the moment the finger landed. On the keyboard, D/K/arrow keys slice.
 - **UI conventions established through iteration** (deviating from these should be a deliberate
   choice, not an accident):
   - No app-level header/footer chrome. `App.kt` has no title bar; stage switching is a small tab
@@ -122,6 +134,6 @@ screenshot check. Say so explicitly rather than claiming a visual change looks r
 An Oboe/AAudio (native) audio path — Android audio currently runs on a Java `AudioTrack`, which
 works but may have more output latency on some devices — any Wear-specific UI (round-screen
 layout, Wear Compose), a chart format/editor (charts are currently hard-coded Kotlin, e.g.
-`Charts.snapCrabsBacking`), Mango Chop, and per-device/per-audio-route calibration storage. None
+`Charts.snapCrabsBacking`), and per-device/per-audio-route calibration storage. None
 of these are in progress — don't start them without Jeremy asking, per his stated plan to dial in
 the web app first.

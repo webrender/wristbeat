@@ -17,9 +17,12 @@ fun judge(errorMs: Double): Grade? {
     }
 }
 
-/** True once the song position has passed the target's OK window without a hit being recorded. */
-fun isMissed(currentBeat: Double, targetBeat: Double): Boolean =
-    (currentBeat - targetBeat) * SECONDS_PER_BEAT * 1000.0 > OK_WINDOW_MS
+/**
+ * True once the song position has passed the target's OK window without a hit being recorded.
+ * [secondsPerBeat] defaults to the shared 116 BPM tempo; stages with their own tempo pass theirs.
+ */
+fun isMissed(currentBeat: Double, targetBeat: Double, secondsPerBeat: Double = SECONDS_PER_BEAT): Boolean =
+    (currentBeat - targetBeat) * secondsPerBeat * 1000.0 > OK_WINDOW_MS
 
 enum class Rank { SUPERB, OK, TRY_AGAIN }
 

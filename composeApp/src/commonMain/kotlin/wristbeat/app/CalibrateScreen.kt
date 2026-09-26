@@ -140,7 +140,9 @@ fun CalibrateScreen(onCalibrated: (offsetMs: Double) -> Unit) {
         modifier = Modifier
             .fillMaxSize()
             .then(rememberTapKeyModifier(::handleTap))
-            .pointerInput(Unit) { detectTapGestures { handleTap() } },
+            // onPress, not onTap: judge when the finger lands, not when it lifts, so the offset
+            // Calibrate measures doesn't include how long each tap is held.
+            .pointerInput(Unit) { detectTapGestures(onPress = { handleTap() }) },
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val squareExtent = minOf(size.width, size.height)

@@ -44,11 +44,38 @@ actual class AudioEngine actual constructor() {
                 osc(Wave.SINE, 2960.0, t, 0.004, 0.04, 0.15)
             }
             SoundId.WHIFF -> osc(Wave.SAWTOOTH, 320.0, t, 0.004, 0.06, 0.16, endFreq = 120.0)
+            SoundId.STEEL_PAN -> {
+                val freq = mtof(param)
+                osc(Wave.SINE, freq, t, 0.003, 0.09, 0.45)
+                osc(Wave.SINE, freq * 2.0, t, 0.003, 0.05, 0.2)
+                osc(Wave.SINE, freq * 3.0, t, 0.003, 0.02, 0.08)
+            }
+            SoundId.WHISTLE_MANGO -> whistle(t, 0.26, 520.0, 1150.0)
+            SoundId.WHISTLE_LIME -> whistle(t, 0.13, 950.0, 1900.0)
+            SoundId.WHISTLE_PINEAPPLE -> {
+                whistle(t, 0.12, 1250.0, 800.0)
+                whistle(t + 0.15, 0.12, 1250.0, 800.0)
+            }
+            SoundId.CHOP -> {
+                noise(t, 0.06, 0.55, FilterType.BANDPASS, 1300.0, 1.5)
+                osc(Wave.SINE, 260.0, t, 0.004, 0.5, 0.12, endFreq = 90.0)
+                noise(t + 0.01, 0.1, 0.16, FilterType.HIGHPASS, 5200.0, 1.0)
+            }
+            SoundId.SLICE -> {
+                noise(t, 0.14, 0.4, FilterType.BANDPASS, 3200.0, 1.2)
+                osc(Wave.SINE, 2400.0, t, 0.004, 0.12, 0.1, endFreq = 900.0)
+            }
+            SoundId.THUD -> osc(Wave.SINE, 130.0, t, 0.004, 0.5, 0.16, endFreq = 55.0)
         }
     }
 }
 
 private fun mtof(m: Double): Double = 440.0 * 2.0.pow((m - 69.0) / 12.0)
+
+private fun whistle(t: Double, dur: Double, f0: Double, f1: Double) {
+    osc(Wave.SINE, f0, t, 0.015, 0.2, dur, endFreq = f1)
+    noise(t, 0.03, 0.2, FilterType.BANDPASS, 900.0, 2.0)
+}
 
 // Each note in the chord fires ~11ms after the last, for a strummed feel (see the wasmJs ukeStrum).
 private fun ukeStrum(notes: List<Double>, t: Double) {

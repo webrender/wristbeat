@@ -44,11 +44,44 @@ actual class AudioEngine actual constructor() {
                 jsOsc(ctx, "sine", 2960.0, atSeconds, 0.004, 0.04, 0.15)
             }
             SoundId.WHIFF -> jsOscRamp(ctx, "sawtooth", 320.0, 120.0, atSeconds, 0.004, 0.06, 0.16)
+            SoundId.STEEL_PAN -> {
+                // Steel pans are tuned so the octave and twelfth ring over the fundamental; the
+                // upper partials die away first, which gives the bright "ping" before the hum.
+                val freq = mtof(param)
+                jsOsc(ctx, "sine", freq, atSeconds, 0.003, 0.09, 0.45)
+                jsOsc(ctx, "sine", freq * 2.0, atSeconds, 0.003, 0.05, 0.2)
+                jsOsc(ctx, "sine", freq * 3.0, atSeconds, 0.003, 0.02, 0.08)
+            }
+            // Ported from the prototype's SND.whistle(t, dur, f0, f1) (wristbeat-prototype.html:198).
+            SoundId.WHISTLE_MANGO -> whistle(ctx, noise, atSeconds, 0.26, 520.0, 1150.0)
+            SoundId.WHISTLE_LIME -> whistle(ctx, noise, atSeconds, 0.13, 950.0, 1900.0)
+            // Falling instead of rising, and doubled, so a pineapple is recognisable by ear.
+            SoundId.WHISTLE_PINEAPPLE -> {
+                whistle(ctx, noise, atSeconds, 0.12, 1250.0, 800.0)
+                whistle(ctx, noise, atSeconds + 0.15, 0.12, 1250.0, 800.0)
+            }
+            // Ported from the prototype's SND.chop(t) (wristbeat-prototype.html:210).
+            SoundId.CHOP -> {
+                jsNoise(ctx, noise, atSeconds, 0.06, 0.55, "bandpass", 1300.0, 1.5)
+                jsOscRamp(ctx, "sine", 260.0, 90.0, atSeconds, 0.004, 0.5, 0.12)
+                jsNoise(ctx, noise, atSeconds + 0.01, 0.1, 0.16, "highpass", 5200.0, 1.0)
+            }
+            SoundId.SLICE -> {
+                jsNoise(ctx, noise, atSeconds, 0.14, 0.4, "bandpass", 3200.0, 1.2)
+                jsOscRamp(ctx, "sine", 2400.0, 900.0, atSeconds, 0.004, 0.12, 0.1)
+            }
+            // Ported from the prototype's SND.thud(t) (wristbeat-prototype.html:215).
+            SoundId.THUD -> jsOscRamp(ctx, "sine", 130.0, 55.0, atSeconds, 0.004, 0.5, 0.16)
         }
     }
 }
 
 private fun mtof(m: Double): Double = 440.0 * 2.0.pow((m - 69.0) / 12.0)
+
+private fun whistle(ctx: JsAny, noise: JsAny, t: Double, dur: Double, f0: Double, f1: Double) {
+    jsOscRamp(ctx, "sine", f0, f1, t, 0.015, 0.2, dur)
+    jsNoise(ctx, noise, t, 0.03, 0.2, "bandpass", 900.0, 2.0)
+}
 
 // Ported from the prototype's SND.uke(t, notes, len) (wristbeat-prototype.html:193): each note in the
 // chord fires ~11ms after the last, giving a strummed feel instead of a flat chord stab.
