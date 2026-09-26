@@ -1,25 +1,49 @@
 package wristbeat.app
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.jetbrains.compose.resources.Font
+import wristbeat.app.generated.resources.Res
+import wristbeat.app.generated.resources.sniglet_extrabold
+import wristbeat.app.generated.resources.sniglet_regular
 
 /**
- * Bold, shadowed, letter-spaced, all-caps HUD text standing in for a real display font: reads as
- * game overlay copy rather than default Material body text. [loud] is for headline-weight lines
- * (titles, ranks); the default weight is for secondary status/stat readouts.
+ * Sniglet (OFL-licensed, see THIRD_PARTY_LICENSES/sniglet-OFL.txt) — a bubbly, rounded display
+ * face standing in for a custom game font. [loud] lines (titles, ranks, button labels) use the
+ * ExtraBold cut; regular HUD readouts use the lighter cut. Two real weights, not synthetic bold,
+ * so we never set `fontWeight` on the [Text] below and let Skia render the actual glyphs.
+ */
+@Composable
+private fun hudFontFamily(loud: Boolean): FontFamily =
+    FontFamily(Font(if (loud) Res.font.sniglet_extrabold else Res.font.sniglet_regular))
+
+/**
+ * Bold, shadowed, letter-spaced, all-caps HUD text reading as game overlay copy rather than
+ * default Material body text. [loud] is for headline-weight lines (titles, ranks); the default
+ * weight is for secondary status/stat readouts.
  */
 @Composable
 fun HudText(
@@ -32,9 +56,9 @@ fun HudText(
         text = text.uppercase(),
         modifier = modifier,
         color = color,
-        fontWeight = FontWeight.Black,
-        fontSize = if (loud) 22.sp else 13.sp,
-        letterSpacing = if (loud) 0.6.sp else 0.8.sp,
+        fontFamily = hudFontFamily(loud),
+        fontSize = if (loud) 24.sp else 14.sp,
+        letterSpacing = if (loud) 0.3.sp else 0.4.sp,
         textAlign = TextAlign.Center,
         style = TextStyle(
             shadow = Shadow(color = Color.Black.copy(alpha = 0.7f), offset = Offset(0f, 2f), blurRadius = 6f),
@@ -42,14 +66,53 @@ fun HudText(
     )
 }
 
-/** A small translucent pill behind a HUD readout — a compact game-HUD tag, not a page-wide card. */
+private val PanelShape = RoundedCornerShape(10.dp)
+
+/**
+ * A chunky "console button" panel: small-radius rounded corners (not a pill/stadium), a
+ * top-to-bottom color bevel, a glassy top sheen, a bright rim, and a drop shadow — the shared
+ * look for every clickable control and HUD backdrop in the app. Deliberately replaces flat
+ * RoundedCornerShape(50) pills, which read as web chips rather than game UI (think Wii Channel
+ * tiles, not Material chips). Pass [onClick] to make it interactive (tabs, toggles); omit it for
+ * a static HUD readout backdrop.
+ */
 @Composable
-fun HudChip(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    Box(
-        modifier = modifier
-            .background(Color.Black.copy(alpha = 0.34f), RoundedCornerShape(50))
-            .padding(horizontal = 14.dp, vertical = 6.dp),
-    ) {
+fun GameButton(
+    modifier: Modifier = Modifier,
+    accent: Color = Color(0xFF123331),
+    enabled: Boolean = true,
+    onClick: (() -> Unit)? = null,
+    content: @Composable () -> Unit,
+) {
+    val rim = lerp(accent, Color.Black, 0.45f)
+    var panelModifier = modifier
+        .shadow(elevation = 5.dp, shape = PanelShape, ambientColor = Color.Black, spotColor = Color.Black)
+        .clip(PanelShape)
+        .background(Brush.verticalGradient(listOf(lerp(accent, Color.White, 0.22f), accent, lerp(accent, Color.Black, 0.24f))))
+        .drawBehind {
+            // Glassy top sheen, like a Wii Channel tile catching a light source from above.
+            drawRoundRect(
+                color = Color.White.copy(alpha = 0.20f),
+                topLeft = Offset.Zero,
+                size = Size(size.width, size.height * 0.46f),
+            )
+        }
+        .border(width = 2.dp, color = rim, shape = PanelShape)
+    if (onClick != null) {
+        panelModifier = panelModifier.clickable(
+            enabled = enabled,
+            interactionSource = remember { MutableInteractionSource() },
+            indication = null,
+            onClick = onClick,
+        )
+    }
+    Box(modifier = panelModifier.padding(horizontal = 14.dp, vertical = 7.dp)) {
         content()
     }
+}
+
+/** A HUD readout backdrop — a [GameButton] with no click handler. */
+@Composable
+fun HudChip(modifier: Modifier = Modifier, accent: Color = Color(0xFF123331), content: @Composable () -> Unit) {
+    GameButton(modifier = modifier, accent = accent, content = content)
 }

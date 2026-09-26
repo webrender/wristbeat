@@ -79,6 +79,7 @@ fun SnapCrabsScreen() {
     var targetPulsePhase by remember { mutableStateOf(0f) }
     var playerPulsePhase by remember { mutableStateOf(0f) }
     var tally by remember { mutableStateOf(ScoreTally()) }
+    var showHighway by remember { mutableStateOf(true) }
     val runLengthSeconds = remember { (SNAP_CRABS_END_BEATS * SECONDS_PER_BEAT).roundToInt() }
 
     LaunchedEffect(started, finished) {
@@ -176,16 +177,18 @@ fun SnapCrabsScreen() {
 
             drawBeachBackground(size.width, size.height, beatPosition)
 
-            drawNoteHighway(
-                leadCues = stage.leadCues,
-                targets = stage.targets,
-                beatPosition = beatPosition,
-                lookaheadBeats = 2.5,
-                hitFlash = maxOf(beatFlashPhase * 0.5f, targetPulsePhase),
-                laneY = sy(0.32f),
-                laneLeftX = sx(0.20f),
-                laneRightX = sx(0.92f),
-            )
+            if (showHighway) {
+                drawNoteHighway(
+                    leadCues = stage.leadCues,
+                    targets = stage.targets,
+                    beatPosition = beatPosition,
+                    lookaheadBeats = 2.5,
+                    hitFlash = maxOf(beatFlashPhase * 0.5f, targetPulsePhase),
+                    laneY = sy(0.32f),
+                    laneLeftX = sx(0.20f),
+                    laneRightX = sx(0.92f),
+                )
+            }
 
             val bodyRadius = squareExtent * 0.13f
             val crabScale = bodyRadius / 46f
@@ -210,8 +213,12 @@ fun SnapCrabsScreen() {
             )
         }
 
-        HudChip(modifier = Modifier.align(Alignment.TopStart).padding(16.dp)) {
-            HudText("Snap Crabs", color = Color(0xFF2FBF9E))
+        Column(
+            modifier = Modifier.align(Alignment.TopStart).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            HudChip { HudText("Snap Crabs", color = Color(0xFF2FBF9E)) }
+            ChartToggle(showHighway) { showHighway = !showHighway }
         }
 
         HudChip(modifier = Modifier.align(Alignment.TopCenter).padding(top = 16.dp)) {
@@ -404,6 +411,17 @@ private fun DrawScope.drawBeachBackground(w: Float, h: Float, beatPosition: Doub
         val fx = (i * 53 % 977) / 977f
         val fy = (i * 131 % 613) / 613f
         drawRect(Color(0xFFE3BC80), topLeft = Offset(fx * w, sandTop + fy * sandHeight), size = Size(3f, 2f))
+    }
+}
+
+/** Lets a player hide the note highway (the "visual beat indicator chart") and play by ear alone. */
+@Composable
+private fun ChartToggle(on: Boolean, onToggle: () -> Unit) {
+    GameButton(
+        accent = if (on) Color(0xFF2FBF9E) else Color(0xFF16302D),
+        onClick = onToggle,
+    ) {
+        HudText(if (on) "Chart: on" else "Chart: off", color = if (on) Color(0xFF06211D) else Color(0xFFAAB8B5))
     }
 }
 

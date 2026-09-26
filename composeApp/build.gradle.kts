@@ -36,8 +36,14 @@ kotlin {
             implementation(compose.foundation)
             implementation(compose.material3)
             implementation(compose.ui)
+            implementation(compose.components.resources)
         }
     }
+}
+
+// Custom fonts (composeApp/src/commonMain/composeResources/font) — see Hud.kt.
+compose.resources {
+    packageOfResClass = "wristbeat.app.generated.resources"
 }
 
 android {

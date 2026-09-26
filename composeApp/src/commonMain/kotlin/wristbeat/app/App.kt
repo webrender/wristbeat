@@ -1,15 +1,11 @@
 package wristbeat.app
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -18,7 +14,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
@@ -60,21 +55,10 @@ private fun StageTabs(current: Stage, onSelect: (Stage) -> Unit, modifier: Modif
     Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         for (s in Stage.entries) {
             val selected = s == current
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(50))
-                    .background(if (selected) Color(0xFF2FBF9E) else Color.Black.copy(alpha = 0.38f))
-                    .border(
-                        width = 1.dp,
-                        color = if (selected) Color(0xFF2FBF9E) else Color.White.copy(alpha = 0.22f),
-                        shape = RoundedCornerShape(50),
-                    )
-                    .clickable(
-                        enabled = s.enabled,
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) { onSelect(s) }
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
+            GameButton(
+                accent = if (selected) Color(0xFF2FBF9E) else Color(0xFF16302D),
+                enabled = s.enabled,
+                onClick = { onSelect(s) },
             ) {
                 HudText(
                     text = if (s.enabled) s.label else "${s.label} · soon",
