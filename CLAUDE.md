@@ -14,8 +14,8 @@ but isn't part of the shipping app.
 ## Architecture
 
 Kotlin Multiplatform + Compose Multiplatform, chosen so one codebase covers web, Android, and Wear
-OS. Only the web (`wasmJs`) target is built out so far — Jeremy's plan is to dial that in before
-touching mobile/watch.
+OS. The web (`wasmJs`) target is the one that's built out. Android and Wear OS are scaffolded (they
+build and launch the shared `App()`), but their platform actuals are placeholders.
 
 - **`core/`** — pure Kotlin, no UI framework, unit-tested (`core/src/commonTest`). Chart data,
   timing/judgment math, and the stage state machines live here so they can be shared and tested
@@ -34,6 +34,12 @@ touching mobile/watch.
     timestamp, `AudioEngine` synthesizes every sound via Web Audio `js()` interop
     (oscillators/noise/filters — no audio files), `WebAudioContext.kt` holds the shared
     `AudioContext` + cached noise buffer, `main.kt` is the `CanvasBasedWindow` entry point.
+  - `androidMain` — Android actuals shared by phone and watch. `HapticEngine` uses `Vibrator`;
+    `AudioClock` is a monotonic system clock and `AudioEngine` is a silent no-op, both placeholders
+    for the Oboe/AAudio-backed versions HANDOFF plans. `WristbeatAndroid.init(context)` supplies
+    the `Context`, since the `expect` classes take no constructor args.
+- **`androidApp/`**, **`wearApp/`** — thin `com.android.application` shells (`MainActivity` →
+  `App()`). `wearApp` declares `android.hardware.type.watch` and is standalone; minSdk 30.
 
 Timing is judged against the audio clock (`AudioClock.now()`), not frame time — taps are converted
 into the same timebase before judging, per HANDOFF's timing-accuracy requirement.
@@ -78,6 +84,14 @@ into the same timebase before judging, per HANDOFF's timing-accuracy requirement
 
 - Unit tests (fast, no browser needed): `./gradlew :core:jvmTest`
 - Compile check: `./gradlew :composeApp:compileKotlinWasmJs`
+- Debug APKs: `./gradlew :androidApp:assembleDebug :wearApp:assembleDebug` (needs an Android SDK;
+  `local.properties` with `sdk.dir` is gitignored).
+- CI: `.github/workflows/android.yml` runs the core tests and builds both debug APKs on every push to
+  `main`, then publishes a GitHub Release tagged `build-<run number>` with `wristbeat-android.apk`
+  and `wristbeat-wear.apk` (stable link: `releases/latest/download/<name>.apk`). versionCode is the
+  run number. CI signs with the `DEBUG_KEYSTORE_BASE64` repo secret when set so releases install
+  over each other; without it each build gets a throwaway key. Local branch is `master`, tracking
+  `origin/main`.
 - Dev server: `./gradlew :composeApp:wasmJsBrowserDevelopmentRun` → serves at `http://localhost:8080`
 
 **The dev server does not hot-reload.** It's a `webpack-dev-server` in front of a compiled Wasm
@@ -101,7 +115,8 @@ screenshot check. Say so explicitly rather than claiming a visual change looks r
 
 ## Not started yet
 
-Android and Wear OS targets, a chart format/editor (charts are currently hard-coded Kotlin, e.g.
+Real Android/Wear audio (Oboe synth + audio-output clock), any Wear-specific UI (round-screen
+layout, Wear Compose), a chart format/editor (charts are currently hard-coded Kotlin, e.g.
 `Charts.snapCrabsBacking`), Mango Chop, and per-device/per-audio-route calibration storage. None
 of these are in progress — don't start them without Jeremy asking, per his stated plan to dial in
 the web app first.
