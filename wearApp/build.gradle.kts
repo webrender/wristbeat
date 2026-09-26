@@ -12,8 +12,16 @@ android {
         applicationId = "wristbeat.wear"
         minSdk = 30
         targetSdk = 35
-        versionCode = 1
+        // CI numbers each build so every release installs as an upgrade over the last.
+        versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toInt() ?: 1
         versionName = "0.1"
+    }
+    signingConfigs {
+        // CI signs with one stable key (DEBUG_KEYSTORE_BASE64 secret) so a newer release can be
+        // installed over an older one; local builds keep the machine's default debug key.
+        getByName("debug") {
+            System.getenv("WRISTBEAT_DEBUG_KEYSTORE")?.let { storeFile = file(it) }
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
