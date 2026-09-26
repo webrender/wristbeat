@@ -22,11 +22,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
-// Snap Crabs and Mango Chop are stubbed this iteration; only Calibrate is playable.
+// Mango Chop is stubbed this iteration; Calibrate and Snap Crabs are playable.
 // Calibrate opens first by default per Jeremy's feedback on the prototype.
 enum class Stage(val label: String, val enabled: Boolean) {
     CALIBRATE("Calibrate", enabled = true),
-    SNAP_CRABS("Snap Crabs", enabled = false),
+    SNAP_CRABS("Snap Crabs", enabled = true),
     MANGO_CHOP("Mango Chop", enabled = false),
 }
 
@@ -50,7 +50,7 @@ fun App() {
             ) {
                 when (stage) {
                     Stage.CALIBRATE -> CalibrateScreen()
-                    Stage.SNAP_CRABS -> ComingSoon(Stage.SNAP_CRABS.label)
+                    Stage.SNAP_CRABS -> SnapCrabsScreen()
                     Stage.MANGO_CHOP -> ComingSoon(Stage.MANGO_CHOP.label)
                 }
             }

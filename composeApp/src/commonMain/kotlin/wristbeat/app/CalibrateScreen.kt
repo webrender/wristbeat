@@ -26,6 +26,7 @@ import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
@@ -35,7 +36,9 @@ import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.round
+import kotlin.math.roundToInt
 import kotlin.math.sin
+import wristbeat.core.CALIBRATE_COUNT_IN_BEATS
 import wristbeat.core.CALIBRATE_TOTAL_BEATS
 import wristbeat.core.CalibrateResult
 import wristbeat.core.CalibrateStage
@@ -65,6 +68,7 @@ fun CalibrateScreen() {
     var tapCount by remember { mutableStateOf(0) }
     var recentErrors by remember { mutableStateOf(listOf<Double>()) }
     var result by remember { mutableStateOf<CalibrateResult?>(null) }
+    val runLengthSeconds = remember { (CALIBRATE_TOTAL_BEATS * SECONDS_PER_BEAT).roundToInt() }
 
     // Look-ahead scheduler + per-frame beat position, mirroring the prototype's 25ms-interval
     // scheduler but driven by the frame clock instead of setInterval (which browsers throttle
@@ -143,6 +147,21 @@ fun CalibrateScreen() {
                 drawCircle(color = Color(0xFF0E3A3D), radius = radius)
                 drawCircle(color = Color.White.copy(alpha = 0.10f), radius = safeRadius, style = Stroke(width = 3f))
 
+                // Progress ring: how far through the fixed 36-beat run we are, so "how long is this"
+                // has a visible answer instead of just a number.
+                if (started) {
+                    val progress = (beatPosition / CALIBRATE_TOTAL_BEATS).coerceIn(0.0, 1.0).toFloat()
+                    drawArc(
+                        color = Color(0xFF2FBF9E),
+                        startAngle = -90f,
+                        sweepAngle = progress * 360f,
+                        useCenter = false,
+                        topLeft = Offset(center.x - radius + 3f, center.y - radius + 3f),
+                        size = Size((radius - 3f) * 2f, (radius - 3f) * 2f),
+                        style = Stroke(width = 5f),
+                    )
+                }
+
                 // Anticipatory sweep: one full revolution per beat, arriving at the target
                 // mark (12 o'clock) exactly when the click plays.
                 val phase = if (beatPosition < 0) 0.0 else beatPosition - floor(beatPosition)
@@ -171,10 +190,23 @@ fun CalibrateScreen() {
                     Text("from ${r.tapCount} taps", color = Color(0xFFAAB8B5))
                     Text("Tap to try again", color = Color(0xFFAAB8B5))
                 }
-                !started -> Text("Tap to start", color = Color.White)
+                !started -> {
+                    Text("Tap to start", color = Color.White)
+                    Text(
+                        "$CALIBRATE_TOTAL_BEATS beats, about ${runLengthSeconds}s — a $CALIBRATE_COUNT_IN_BEATS-beat " +
+                            "count-in, then tap every beat",
+                        color = Color(0xFFAAB8B5),
+                    )
+                }
                 else -> {
-                    Text("Tap with the click", color = Color.White)
-                    Text("$tapCount taps", color = Color(0xFFAAB8B5))
+                    val beatIndex = floor(beatPosition).toInt()
+                    if (beatIndex < CALIBRATE_COUNT_IN_BEATS) {
+                        Text("Get ready…", color = Color.White)
+                    } else {
+                        Text("Tap with the click", color = Color.White)
+                    }
+                    val shownBeat = beatIndex.coerceIn(0, CALIBRATE_TOTAL_BEATS)
+                    Text("Beat $shownBeat of $CALIBRATE_TOTAL_BEATS  ·  $tapCount taps", color = Color(0xFFAAB8B5))
                     Spacer(Modifier.height(6.dp))
                     TimingStrip(recentErrors)
                 }
