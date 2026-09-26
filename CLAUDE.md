@@ -34,10 +34,14 @@ build and launch the shared `App()`), but their platform actuals are placeholder
     timestamp, `AudioEngine` synthesizes every sound via Web Audio `js()` interop
     (oscillators/noise/filters — no audio files), `WebAudioContext.kt` holds the shared
     `AudioContext` + cached noise buffer, `main.kt` is the `CanvasBasedWindow` entry point.
-  - `androidMain` — Android actuals shared by phone and watch. `HapticEngine` uses `Vibrator`;
-    `AudioClock` is a monotonic system clock and `AudioEngine` is a silent no-op, both placeholders
-    for the Oboe/AAudio-backed versions HANDOFF plans. `WristbeatAndroid.init(context)` supplies
-    the `Context`, since the `expect` classes take no constructor args.
+  - `androidMain` — Android actuals shared by phone and watch. `HapticEngine` uses `Vibrator`.
+    `AndroidAudio.kt` owns one low-latency float `AudioTrack` fed by a render thread that mixes
+    `SynthVoice.kt`'s software voices (ports of the Web Audio osc/noise/bass graphs, same
+    parameters); `AudioEngine` maps `SoundId`s onto those voices and `AudioClock` reads the stream's
+    `AudioTrack.getTimestamp()` output position, so both share one timebase like `WebAudioContext`
+    on web. Pure Kotlin/JVM — no NDK/Oboe yet. The stream pauses (and the clock holds) while the
+    app is backgrounded. `WristbeatAndroid.init(context)` supplies the `Context` and registers that
+    lifecycle hook, since the `expect` classes take no constructor args.
 - **`androidApp/`**, **`wearApp/`** — thin `com.android.application` shells (`MainActivity` →
   `App()`). `wearApp` declares `android.hardware.type.watch` and is standalone; minSdk 30.
 
@@ -115,7 +119,8 @@ screenshot check. Say so explicitly rather than claiming a visual change looks r
 
 ## Not started yet
 
-Real Android/Wear audio (Oboe synth + audio-output clock), any Wear-specific UI (round-screen
+An Oboe/AAudio (native) audio path — Android audio currently runs on a Java `AudioTrack`, which
+works but may have more output latency on some devices — any Wear-specific UI (round-screen
 layout, Wear Compose), a chart format/editor (charts are currently hard-coded Kotlin, e.g.
 `Charts.snapCrabsBacking`), Mango Chop, and per-device/per-audio-route calibration storage. None
 of these are in progress — don't start them without Jeremy asking, per his stated plan to dial in

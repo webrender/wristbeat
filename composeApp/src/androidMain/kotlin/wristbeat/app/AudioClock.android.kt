@@ -2,17 +2,13 @@ package wristbeat.app
 
 import android.os.SystemClock
 
-// Shared origin so every AudioClock instance agrees, like the single shared AudioContext on web.
-private val originNanos = SystemClock.elapsedRealtimeNanos()
-
-/**
- * Placeholder clock: a monotonic system clock, not the audio output clock. Swap for Oboe/AAudio's
- * stream timestamp alongside the real AudioEngine, per HANDOFF's timing-accuracy requirement.
- */
+/** Wraps [AndroidAudio]'s output stream: [now] is the stream time of the sample reaching the speaker. */
 actual class AudioClock actual constructor() {
-    actual fun start() {}
+    actual fun start() {
+        AndroidAudio.ensureStarted()
+    }
 
-    actual fun now(): Double = (SystemClock.elapsedRealtimeNanos() - originNanos) / 1e9
+    actual fun now(): Double = AndroidAudio.now()
 
     // Android input events are stamped in SystemClock.uptimeMillis().
     actual fun audibleTimeForInputEvent(eventTimestampMs: Double): Double =
