@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -24,7 +25,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.input.pointer.pointerInput
@@ -157,14 +161,28 @@ fun SnapCrabsScreen() {
             .pointerInput(Unit) { detectTapGestures { handleTap() } },
         contentAlignment = Alignment.Center,
     ) {
-        // Reserve room below the circle for the legend + status text (same fix as CalibrateScreen).
+        // Reserve room below the stage for the legend + status text (same fix as CalibrateScreen).
         val textReserve = 180.dp
         val availableHeight = (maxHeight - textReserve).coerceAtLeast(120.dp)
-        val diameter = if (maxWidth < availableHeight) maxWidth else availableHeight
 
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Canvas(modifier = Modifier.size(diameter)) {
-                drawCircle(color = Color(0xFF123B3D), radius = size.minDimension / 2f)
+            // The beach bleeds to fill the whole available width; the crabs and note highway stay
+            // centered in whatever square fits, same fullscreen-desktop treatment as CalibrateScreen.
+            Canvas(modifier = Modifier.fillMaxWidth().height(availableHeight)) {
+                val squareExtent = minOf(size.width, size.height)
+                val squareLeft = (size.width - squareExtent) / 2f
+                val squareTop = (size.height - squareExtent) / 2f
+                fun sx(fraction: Float) = squareLeft + fraction * squareExtent
+                fun sy(fraction: Float) = squareTop + fraction * squareExtent
+
+                drawBeachBackground(size.width, size.height)
+                // A translucent panel behind the stage keeps the highway and crabs legible over the scenery.
+                drawRoundRect(
+                    color = Color.Black.copy(alpha = 0.18f),
+                    topLeft = Offset(squareLeft, squareTop),
+                    size = Size(squareExtent, squareExtent),
+                    cornerRadius = CornerRadius(squareExtent * 0.06f),
+                )
 
                 drawNoteHighway(
                     leadCues = stage.leadCues,
@@ -172,24 +190,14 @@ fun SnapCrabsScreen() {
                     beatPosition = beatPosition,
                     lookaheadBeats = 2.5,
                     hitFlash = maxOf(beatFlashPhase * 0.5f, targetPulsePhase),
-                    laneY = size.height * 0.32f,
-                    laneLeftX = size.width * 0.20f,
-                    laneRightX = size.width * 0.92f,
+                    laneY = sy(0.32f),
+                    laneLeftX = sx(0.20f),
+                    laneRightX = sx(0.92f),
                 )
 
-                val bodyRadius = size.minDimension * 0.13f
-                drawCrab(
-                    Offset(size.width * 0.28f, size.height * 0.66f),
-                    bodyRadius,
-                    Color(0xFFDE4636),
-                    leadPulsePhase,
-                )
-                drawCrab(
-                    Offset(size.width * 0.72f, size.height * 0.66f),
-                    bodyRadius,
-                    Color(0xFF3F82D8),
-                    playerPulsePhase,
-                )
+                val bodyRadius = squareExtent * 0.13f
+                drawCrab(Offset(sx(0.28f), sy(0.66f)), bodyRadius, Color(0xFFDE4636), leadPulsePhase)
+                drawCrab(Offset(sx(0.72f), sy(0.66f)), bodyRadius, Color(0xFF3F82D8), playerPulsePhase)
             }
 
             Spacer(Modifier.height(4.dp))
@@ -284,6 +292,31 @@ private fun DrawScope.drawNoteHighway(
         val untilTarget = target - beatPosition
         if (untilTarget < -0.05 || untilTarget > lookaheadBeats) continue
         drawCircle(Color(0xFF6FB6FF), radius = 8f, center = Offset(xFor(target), targetRowY))
+    }
+}
+
+/** A flat-shape beach scene (sky, sun, water, sand) that bleeds to fill the whole canvas, per HANDOFF's "extended background" note. */
+private fun DrawScope.drawBeachBackground(w: Float, h: Float) {
+    val horizon = h * 0.42f
+    drawRect(
+        brush = Brush.verticalGradient(colors = listOf(Color(0xFFFF8E64), Color(0xFFFFD49A)), startY = 0f, endY = horizon),
+        size = Size(w, horizon),
+    )
+    drawCircle(Color(0xFFFFF1C4), radius = h * 0.09f, center = Offset(w * 0.84f, h * 0.15f))
+    val waterHeight = h * 0.07f
+    drawRect(color = Color(0xFF2E9C9A), topLeft = Offset(0f, horizon), size = Size(w, waterHeight))
+    drawRect(
+        color = Color(0xFF3AB0AC),
+        topLeft = Offset(0f, horizon),
+        size = Size(w, waterHeight * 0.35f),
+    )
+    val sandTop = horizon + waterHeight
+    drawRect(color = Color(0xFFF3D29C), topLeft = Offset(0f, sandTop), size = Size(w, h - sandTop))
+    val sandHeight = h - sandTop
+    for (i in 0 until 70) {
+        val fx = (i * 53 % 977) / 977f
+        val fy = (i * 131 % 613) / 613f
+        drawRect(Color(0xFFE3BC80), topLeft = Offset(fx * w, sandTop + fy * sandHeight), size = Size(3f, 2f))
     }
 }
 

@@ -23,6 +23,14 @@ actual class AudioEngine actual constructor() {
             SoundId.BASS_LONG -> jsBass(ctx, mtof(param), atSeconds, 0.35)
             SoundId.BASS_MED -> jsBass(ctx, mtof(param), atSeconds, 0.3)
             SoundId.BASS_SHORT -> jsBass(ctx, mtof(param), atSeconds, 0.18)
+            SoundId.UKE_F -> ukeStrum(ctx, listOf(65.0, 69.0, 72.0), atSeconds)
+            SoundId.UKE_C -> ukeStrum(ctx, listOf(64.0, 67.0, 72.0), atSeconds)
+            SoundId.UKE_BB -> ukeStrum(ctx, listOf(62.0, 65.0, 70.0), atSeconds)
+            SoundId.MEL -> {
+                val freq = mtof(param)
+                jsOsc(ctx, "sine", freq, atSeconds, 0.004, 0.12 * 0.45, 0.38)
+                jsOsc(ctx, "triangle", freq * 2.0, atSeconds, 0.004, 0.035 * 0.45, 0.1)
+            }
             SoundId.LEAD_SNAP -> {
                 jsNoise(ctx, noise, atSeconds, 0.045, 0.6, "bandpass", 2200.0, 5.0)
                 jsOsc(ctx, "sine", 1040.0, atSeconds, 0.004, 0.28, 0.035)
@@ -41,6 +49,17 @@ actual class AudioEngine actual constructor() {
 }
 
 private fun mtof(m: Double): Double = 440.0 * 2.0.pow((m - 69.0) / 12.0)
+
+// Ported from the prototype's SND.uke(t, notes, len) (wristbeat-prototype.html:193): each note in the
+// chord fires ~11ms after the last, giving a strummed feel instead of a flat chord stab.
+private fun ukeStrum(ctx: JsAny, notes: List<Double>, t: Double) {
+    notes.forEachIndexed { i, note ->
+        val tt = t + i * 0.011
+        val freq = mtof(note)
+        jsOsc(ctx, "triangle", freq, tt, 0.004, 0.075, 0.14)
+        jsOsc(ctx, "square", freq, tt, 0.004, 0.018, 0.05)
+    }
+}
 
 // Ported from the prototype's SND.click(t, accent) (wristbeat-prototype.html:216).
 private fun jsClick(ctx: JsAny, atSeconds: Double, accent: Boolean): Unit = js(

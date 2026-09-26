@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
@@ -27,7 +28,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
@@ -137,19 +140,24 @@ fun CalibrateScreen() {
             .pointerInput(Unit) { detectTapGestures { handleTap() } },
         contentAlignment = Alignment.Center,
     ) {
-        // Reserve room below the circle for the status text so it can never get pushed off-screen
-        // (the circle alone would otherwise happily fill 100% of a wide, short viewport).
+        // Reserve room below the stage for the status text so it can never get pushed off-screen.
         val textReserve = 150.dp
         val availableHeight = (maxHeight - textReserve).coerceAtLeast(120.dp)
-        val diameter = if (maxWidth < availableHeight) maxWidth else availableHeight
 
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Canvas(modifier = Modifier.size(diameter)) {
-                val radius = size.minDimension / 2f
+            // The stage fills the available width — no longer clipped into a watch-sized circle on
+            // desktop. A round dial (with a proper watch-safe inset) sits centered in whatever square
+            // fits, and the extended background bleeds out to the sides per HANDOFF's scaling notes.
+            Canvas(modifier = Modifier.fillMaxWidth().height(availableHeight)) {
+                val squareExtent = minOf(size.width, size.height)
+                val stageCenter = Offset(size.width / 2f, size.height / 2f)
+                val radius = squareExtent / 2f * 0.85f
                 val safeRadius = radius * 0.85f
 
-                drawCircle(color = Color(0xFF0E3A3D), radius = radius)
-                drawCircle(color = Color.White.copy(alpha = 0.10f), radius = safeRadius, style = Stroke(width = 3f))
+                drawCalibrateBackground(size.width, size.height, stageCenter, radius * 1.35f)
+
+                drawCircle(color = Color(0xFF0E3A3D), radius = radius, center = stageCenter)
+                drawCircle(color = Color.White.copy(alpha = 0.10f), radius = safeRadius, center = stageCenter, style = Stroke(width = 3f))
 
                 // Progress ring: how far through the fixed 36-beat run we are, so "how long is this"
                 // has a visible answer instead of just a number.
@@ -160,7 +168,7 @@ fun CalibrateScreen() {
                         startAngle = -90f,
                         sweepAngle = progress * 360f,
                         useCenter = false,
-                        topLeft = Offset(center.x - radius + 3f, center.y - radius + 3f),
+                        topLeft = Offset(stageCenter.x - radius + 3f, stageCenter.y - radius + 3f),
                         size = Size((radius - 3f) * 2f, (radius - 3f) * 2f),
                         style = Stroke(width = 5f),
                     )
@@ -170,14 +178,14 @@ fun CalibrateScreen() {
                 // mark (12 o'clock) exactly when the click plays.
                 val phase = if (beatPosition < 0) 0.0 else beatPosition - floor(beatPosition)
                 val angle = (-90f + phase.toFloat() * 360f) * (PI.toFloat() / 180f)
-                val marker = Offset(center.x + safeRadius * cos(angle), center.y + safeRadius * sin(angle))
+                val marker = Offset(stageCenter.x + safeRadius * cos(angle), stageCenter.y + safeRadius * sin(angle))
                 if (started && !finished) {
-                    drawLine(Color(0xFFFFB320), center, marker, strokeWidth = 4f)
+                    drawLine(Color(0xFFFFB320), stageCenter, marker, strokeWidth = 4f)
                     drawCircle(Color(0xFFFFB320), radius = 8f, center = marker)
                 }
 
                 // Target mark flashes exactly on the beat, giving a second, reactive confirmation.
-                val target = Offset(center.x, center.y - safeRadius)
+                val target = Offset(stageCenter.x, stageCenter.y - safeRadius)
                 drawCircle(Color.White, radius = 10f + 16f * flashPhase, center = target, alpha = 0.20f + 0.55f * flashPhase)
                 drawCircle(Color.White, radius = 6f, center = target)
             }
@@ -241,6 +249,31 @@ private fun TimingStrip(errors: List<Double>) {
     Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.width(width)) {
         Text("early", color = Color(0xFF6E827D))
         Text("late", color = Color(0xFF6E827D))
+    }
+}
+
+/** A dark gradient field with a soft glow behind the dial and faint sonar rings bleeding into the side margins. */
+private fun DrawScope.drawCalibrateBackground(w: Float, h: Float, glowCenter: Offset, glowRadius: Float) {
+    drawRect(
+        brush = Brush.verticalGradient(colors = listOf(Color(0xFF14312F), Color(0xFF081514)), startY = 0f, endY = h),
+        size = Size(w, h),
+    )
+    drawCircle(
+        brush = Brush.radialGradient(
+            colors = listOf(Color(0xFF2FBF9E).copy(alpha = 0.16f), Color.Transparent),
+            center = glowCenter,
+            radius = glowRadius,
+        ),
+        radius = glowRadius,
+        center = glowCenter,
+    )
+    for (i in 1..3) {
+        drawCircle(
+            color = Color.White.copy(alpha = 0.035f),
+            radius = glowRadius * (1f + i * 0.4f),
+            center = glowCenter,
+            style = Stroke(width = 1.5f),
+        )
     }
 }
 
