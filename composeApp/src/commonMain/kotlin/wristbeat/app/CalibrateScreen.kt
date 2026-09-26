@@ -1,0 +1,214 @@
+package wristbeat.app
+
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameMillis
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.dp
+import kotlin.math.PI
+import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.floor
+import kotlin.math.round
+import kotlin.math.sin
+import wristbeat.core.CALIBRATE_TOTAL_BEATS
+import wristbeat.core.CalibrateResult
+import wristbeat.core.CalibrateStage
+import wristbeat.core.PERFECT_WINDOW_MS
+import wristbeat.core.SECONDS_PER_BEAT
+
+/**
+ * Calibrate is the app's opening stage (per Jeremy's feedback: it should run first, not Snap Crabs).
+ * Two other fixes live here too: no sound plays for the player's own tap (it was masking the click
+ * track and making calibration harder to judge), and the beat indicator sweeps continuously across
+ * each beat so the player can anticipate a click instead of only reacting to a flash after it lands.
+ */
+@Composable
+fun CalibrateScreen() {
+    val audioClock = remember { AudioClock() }
+    val audioEngine = remember { AudioEngine() }
+    val haptics = remember { HapticEngine() }
+    val stage = remember { CalibrateStage() }
+
+    var started by remember { mutableStateOf(false) }
+    var finished by remember { mutableStateOf(false) }
+    var t0 by remember { mutableStateOf(0.0) }
+    var scheduledIndex by remember { mutableStateOf(0) }
+    var beatPosition by remember { mutableStateOf(-1.0) }
+    var lastFiredBeat by remember { mutableStateOf(-1) }
+    var flashPhase by remember { mutableStateOf(0f) }
+    var tapCount by remember { mutableStateOf(0) }
+    var recentErrors by remember { mutableStateOf(listOf<Double>()) }
+    var result by remember { mutableStateOf<CalibrateResult?>(null) }
+
+    // Look-ahead scheduler + per-frame beat position, mirroring the prototype's 25ms-interval
+    // scheduler but driven by the frame clock instead of setInterval (which browsers throttle
+    // in background tabs).
+    LaunchedEffect(started, finished) {
+        var lastFrameMillis = 0L
+        while (started && !finished) {
+            val frameMillis = withFrameMillis { it }
+            val dt = if (lastFrameMillis == 0L) 0f else (frameMillis - lastFrameMillis) / 1000f
+            lastFrameMillis = frameMillis
+
+            val now = audioClock.now()
+            val horizon = now + 0.15
+            while (scheduledIndex < stage.chart.size) {
+                val ev = stage.chart[scheduledIndex]
+                val t = t0 + ev.beat * SECONDS_PER_BEAT
+                if (t > horizon) break
+                if (t >= now - 0.01) audioEngine.play(ev.sound, t)
+                scheduledIndex++
+            }
+
+            val beat = (now - t0) / SECONDS_PER_BEAT
+            beatPosition = beat
+            val beatIndex = floor(beat).toInt()
+            if (beatIndex > lastFiredBeat && beatIndex in 0 until CALIBRATE_TOTAL_BEATS) {
+                lastFiredBeat = beatIndex
+                flashPhase = 1f
+            }
+            flashPhase = (flashPhase - dt * 4f).coerceAtLeast(0f)
+
+            if (beat >= CALIBRATE_TOTAL_BEATS && result == null) {
+                result = stage.finish()
+                finished = true
+            }
+        }
+    }
+
+    fun handleTap() {
+        if (!started) {
+            audioClock.start()
+            t0 = audioClock.now() + 0.3
+            scheduledIndex = 0
+            lastFiredBeat = -1
+            beatPosition = -1.0
+            tapCount = 0
+            recentErrors = emptyList()
+            result = null
+            finished = false
+            started = true
+            return
+        }
+        if (finished) {
+            started = false
+            return
+        }
+        val beat = (audioClock.now() - t0) / SECONDS_PER_BEAT
+        val errorMs = stage.recordTap(beat)
+        haptics.pulse() // confirms the tap registered; never plays a sound here (see class doc)
+        tapCount = stage.tapCount
+        if (errorMs != null) recentErrors = (recentErrors + errorMs).takeLast(16)
+    }
+
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(Unit) { detectTapGestures { handleTap() } },
+        contentAlignment = Alignment.Center,
+    ) {
+        val diameter = if (maxWidth < maxHeight) maxWidth else maxHeight
+
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Canvas(modifier = Modifier.size(diameter)) {
+                val radius = size.minDimension / 2f
+                val safeRadius = radius * 0.85f
+
+                drawCircle(color = Color(0xFF0E3A3D), radius = radius)
+                drawCircle(color = Color.White.copy(alpha = 0.10f), radius = safeRadius, style = Stroke(width = 3f))
+
+                // Anticipatory sweep: one full revolution per beat, arriving at the target
+                // mark (12 o'clock) exactly when the click plays.
+                val phase = if (beatPosition < 0) 0.0 else beatPosition - floor(beatPosition)
+                val angle = (-90f + phase.toFloat() * 360f) * (PI.toFloat() / 180f)
+                val marker = Offset(center.x + safeRadius * cos(angle), center.y + safeRadius * sin(angle))
+                if (started && !finished) {
+                    drawLine(Color(0xFFFFB320), center, marker, strokeWidth = 4f)
+                    drawCircle(Color(0xFFFFB320), radius = 8f, center = marker)
+                }
+
+                // Target mark flashes exactly on the beat, giving a second, reactive confirmation.
+                val target = Offset(center.x, center.y - safeRadius)
+                drawCircle(Color.White, radius = 10f + 16f * flashPhase, center = target, alpha = 0.20f + 0.55f * flashPhase)
+                drawCircle(Color.White, radius = 6f, center = target)
+            }
+
+            Spacer(Modifier.height(4.dp))
+
+            when {
+                result != null -> {
+                    val r = result!!
+                    Text(
+                        if (r.ok) "Offset set: ${formatMs(r.offsetMs)}" else "Not enough taps — try again",
+                        color = Color.White,
+                    )
+                    Text("from ${r.tapCount} taps", color = Color(0xFFAAB8B5))
+                    Text("Tap to try again", color = Color(0xFFAAB8B5))
+                }
+                !started -> Text("Tap to start", color = Color.White)
+                else -> {
+                    Text("Tap with the click", color = Color.White)
+                    Text("$tapCount taps", color = Color(0xFFAAB8B5))
+                    Spacer(Modifier.height(6.dp))
+                    TimingStrip(recentErrors)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TimingStrip(errors: List<Double>) {
+    val width = 200.dp
+    Box(modifier = Modifier.width(width).height(20.dp).background(Color.White.copy(alpha = 0.08f))) {
+        for (err in errors) {
+            val clamped = err.coerceIn(-120.0, 120.0)
+            val fraction = ((clamped + 120.0) / 240.0).toFloat()
+            Box(
+                modifier = Modifier
+                    .offset(x = width * fraction - 3.dp)
+                    .align(Alignment.CenterStart)
+                    .size(6.dp)
+                    .background(
+                        if (abs(err) <= PERFECT_WINDOW_MS) Color(0xFF1C9A6A) else Color(0xFFC98F00),
+                        shape = CircleShape,
+                    ),
+            )
+        }
+    }
+    Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.width(width)) {
+        Text("early", color = Color(0xFF6E827D))
+        Text("late", color = Color(0xFF6E827D))
+    }
+}
+
+private fun formatMs(v: Double): String {
+    val sign = if (v >= 0) "+" else "−"
+    return "$sign${round(abs(v)).toInt()}ms"
+}
