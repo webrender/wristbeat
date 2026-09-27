@@ -2,6 +2,7 @@ package wristbeat.app
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -92,6 +93,33 @@ private fun StageTabs(current: Stage, onSelect: (Stage) -> Unit, compact: Boolea
                     text = (if (compact) s.shortLabel else s.label).let { if (s.enabled) it else "$it · soon" },
                     color = if (selected) Color(0xFF06211D) else Color.White.copy(alpha = if (s.enabled) 0.9f else 0.4f),
                 )
+            }
+        }
+    }
+}
+
+/**
+ * One stage on its own, laid out for a Wear OS watch: the watch's native menu (in `wearApp`)
+ * handles stage switching, the chart toggle and the calibration readout, so there are no tabs or
+ * top HUD here, just the game and a small status panel. [onRunningChanged] reports whether a run
+ * is in progress, so the watch can hold off swipe-to-dismiss and keep the screen on while playing.
+ */
+@Composable
+fun WatchStageScreen(
+    stage: Stage,
+    inputOffsetMs: Double,
+    onCalibrated: (offsetMs: Double) -> Unit,
+    chart: ChartSetting,
+    onRunningChanged: (Boolean) -> Unit,
+) {
+    MaterialTheme {
+        Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0F1B19))) {
+            CompositionLocalProvider(LocalHudLayout provides HudLayout(watch = true)) {
+                when (stage) {
+                    Stage.CALIBRATE -> CalibrateScreen(onCalibrated, onRunningChanged)
+                    Stage.SNAP_CRABS -> SnapCrabsScreen(inputOffsetMs, chart, onRunningChanged)
+                    Stage.MANGO_CHOP -> MangoChopScreen(inputOffsetMs, chart, onRunningChanged)
+                }
             }
         }
     }

@@ -79,7 +79,7 @@ private enum class Cut { NONE, LEFT, RIGHT, TOP, BOTTOM }
  * On desktop, a mouse drag works the same way, and D/K/arrows slice (see [rememberTapKeyModifier]).
  */
 @Composable
-fun MangoChopScreen(inputOffsetMs: Double, chart: ChartSetting) {
+fun MangoChopScreen(inputOffsetMs: Double, chart: ChartSetting, onRunningChanged: (Boolean) -> Unit = {}) {
     val audioClock = remember { AudioClock() }
     val audioEngine = remember { AudioEngine() }
     val haptics = remember { HapticEngine() }
@@ -97,6 +97,8 @@ fun MangoChopScreen(inputOffsetMs: Double, chart: ChartSetting) {
     var keySlashFlip by remember { mutableStateOf(false) }
     var tally by remember { mutableStateOf(ScoreTally()) }
     val runLengthSeconds = remember { (MANGO_CHOP_END_BEATS * secondsPerBeat).roundToInt() }
+    val watch = LocalHudLayout.current.watch
+    ReportRunning(started && !finished, onRunningChanged)
     // Highway: each toss's whistle on the cue row, and its landing (the beat to act on) on the
     // target row. Pineapples are swipe arrows, since they take a swipe rather than a tap.
     val highwayCues = remember(stage) { stage.tosses.map { highwayNote(it.fruit, it.beat, cue = true) } }
@@ -279,7 +281,7 @@ fun MangoChopScreen(inputOffsetMs: Double, chart: ChartSetting) {
         }
 
         Column(
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 28.dp),
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = statusBottomPadding),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             when {
@@ -293,10 +295,7 @@ fun MangoChopScreen(inputOffsetMs: Double, chart: ChartSetting) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             HudText(rank, loud = true)
                             Spacer(Modifier.height(2.dp))
-                            HudText(
-                                "Perfect ${tally.perfect} · OK ${tally.ok} · Miss ${tally.miss}",
-                                color = Color(0xFFAAB8B5),
-                            )
+                            HudText(tallyLine(tally), color = Color(0xFFAAB8B5))
                             HudText("Tap to try again", color = Color(0xFFAAB8B5))
                         }
                     }
@@ -306,16 +305,21 @@ fun MangoChopScreen(inputOffsetMs: Double, chart: ChartSetting) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             HudText("Tap to start", loud = true)
                             Spacer(Modifier.height(2.dp))
-                            HudText(
-                                "Chop mangoes and limes as they land, swipe to slice pineapples " +
-                                    "(~${runLengthSeconds}s, ${MANGO_CHOP_BPM.toInt()} BPM)",
-                                color = Color(0xFFAAB8B5),
-                            )
-                            HudText("Keys: Space/J/F chop · D/K/arrows slice", color = Color(0xFFAAB8B5))
-                            HudText(
-                                if (inputOffsetMs == 0.0) "Not calibrated" else "Calibrated offset ${formatMs(inputOffsetMs)}",
-                                color = Color(0xFFAAB8B5),
-                            )
+                            if (watch) {
+                                // No keyboard on a watch, and the menu shows the calibration offset.
+                                HudText("Tap: chop · swipe: slice", color = Color(0xFFAAB8B5))
+                            } else {
+                                HudText(
+                                    "Chop mangoes and limes as they land, swipe to slice pineapples " +
+                                        "(~${runLengthSeconds}s, ${MANGO_CHOP_BPM.toInt()} BPM)",
+                                    color = Color(0xFFAAB8B5),
+                                )
+                                HudText("Keys: Space/J/F chop · D/K/arrows slice", color = Color(0xFFAAB8B5))
+                                HudText(
+                                    if (inputOffsetMs == 0.0) "Not calibrated" else "Calibrated offset ${formatMs(inputOffsetMs)}",
+                                    color = Color(0xFFAAB8B5),
+                                )
+                            }
                         }
                     }
                 }
@@ -324,10 +328,7 @@ fun MangoChopScreen(inputOffsetMs: Double, chart: ChartSetting) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             HudText(if (beatPosition < 4.0) "Get ready…" else "Chop on the landing", loud = true)
                             Spacer(Modifier.height(2.dp))
-                            HudText(
-                                "Perfect ${tally.perfect} · OK ${tally.ok} · Miss ${tally.miss}",
-                                color = Color(0xFFAAB8B5),
-                            )
+                            HudText(tallyLine(tally), color = Color(0xFFAAB8B5))
                         }
                     }
                 }

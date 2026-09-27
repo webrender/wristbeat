@@ -53,7 +53,7 @@ import wristbeat.core.SECONDS_PER_BEAT
  * each beat so the player can anticipate a click instead of only reacting to a flash after it lands.
  */
 @Composable
-fun CalibrateScreen(onCalibrated: (offsetMs: Double) -> Unit) {
+fun CalibrateScreen(onCalibrated: (offsetMs: Double) -> Unit, onRunningChanged: (Boolean) -> Unit = {}) {
     val audioClock = remember { AudioClock() }
     val audioEngine = remember { AudioEngine() }
     val haptics = remember { HapticEngine() }
@@ -70,6 +70,8 @@ fun CalibrateScreen(onCalibrated: (offsetMs: Double) -> Unit) {
     var recentErrors by remember { mutableStateOf(listOf<Double>()) }
     var result by remember { mutableStateOf<CalibrateResult?>(null) }
     val runLengthSeconds = remember { (CALIBRATE_TOTAL_BEATS * SECONDS_PER_BEAT).roundToInt() }
+    val watch = LocalHudLayout.current.watch
+    ReportRunning(started && !finished, onRunningChanged)
 
     // Look-ahead scheduler + per-frame beat position, mirroring the prototype's 25ms-interval
     // scheduler but driven by the frame clock instead of setInterval (which browsers throttle
@@ -189,7 +191,7 @@ fun CalibrateScreen(onCalibrated: (offsetMs: Double) -> Unit) {
         StageHeader("Calibrate", Color(0xFF2FBF9E))
 
         Column(
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 28.dp),
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = statusBottomPadding),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             when {
@@ -202,7 +204,7 @@ fun CalibrateScreen(onCalibrated: (offsetMs: Double) -> Unit) {
                                 loud = true,
                             )
                             Spacer(Modifier.height(2.dp))
-                            HudText("from ${r.tapCount} taps", color = Color(0xFFAAB8B5))
+                            if (!watch) HudText("from ${r.tapCount} taps", color = Color(0xFFAAB8B5))
                             HudText("Tap to try again", color = Color(0xFFAAB8B5))
                         }
                     }
@@ -213,8 +215,12 @@ fun CalibrateScreen(onCalibrated: (offsetMs: Double) -> Unit) {
                             HudText("Tap to start", loud = true)
                             Spacer(Modifier.height(2.dp))
                             HudText(
-                                "$CALIBRATE_TOTAL_BEATS beats, about ${runLengthSeconds}s — a $CALIBRATE_COUNT_IN_BEATS-beat " +
-                                    "count-in, then tap every beat",
+                                if (watch) {
+                                    "~${runLengthSeconds}s · tap every beat"
+                                } else {
+                                    "$CALIBRATE_TOTAL_BEATS beats, about ${runLengthSeconds}s — a $CALIBRATE_COUNT_IN_BEATS-beat " +
+                                        "count-in, then tap every beat"
+                                },
                                 color = Color(0xFFAAB8B5),
                             )
                         }
@@ -227,7 +233,11 @@ fun CalibrateScreen(onCalibrated: (offsetMs: Double) -> Unit) {
                             HudText(if (beatIndex < CALIBRATE_COUNT_IN_BEATS) "Get ready…" else "Tap with the click", loud = true)
                             Spacer(Modifier.height(2.dp))
                             val shownBeat = beatIndex.coerceIn(0, CALIBRATE_TOTAL_BEATS)
-                            HudText("Beat $shownBeat of $CALIBRATE_TOTAL_BEATS  ·  $tapCount taps", color = Color(0xFFAAB8B5))
+                            HudText(
+                                if (watch) "Beat $shownBeat/$CALIBRATE_TOTAL_BEATS · $tapCount taps"
+                                else "Beat $shownBeat of $CALIBRATE_TOTAL_BEATS  ·  $tapCount taps",
+                                color = Color(0xFFAAB8B5),
+                            )
                         }
                     }
                     Spacer(Modifier.height(8.dp))
@@ -240,7 +250,7 @@ fun CalibrateScreen(onCalibrated: (offsetMs: Double) -> Unit) {
 
 @Composable
 private fun TimingStrip(errors: List<Double>) {
-    val width = 200.dp
+    val width = if (LocalHudLayout.current.watch) 110.dp else 200.dp
     Box(modifier = Modifier.width(width).height(20.dp).background(Color.White.copy(alpha = 0.08f))) {
         for (err in errors) {
             val clamped = err.coerceIn(-120.0, 120.0)

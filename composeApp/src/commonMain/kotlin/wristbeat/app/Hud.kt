@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -41,6 +42,16 @@ private fun hudFontFamily(loud: Boolean): FontFamily =
     FontFamily(Font(if (loud) Res.font.sniglet_extrabold else Res.font.sniglet_regular))
 
 /**
+ * Both Sniglet cuts as one family (Regular at normal weight, ExtraBold at bold and up), for UI
+ * outside the game HUD that sets its own weights, like the watch's native menu.
+ */
+@Composable
+fun wristbeatFontFamily(): FontFamily = FontFamily(
+    Font(Res.font.sniglet_regular, FontWeight.Normal),
+    Font(Res.font.sniglet_extrabold, FontWeight.ExtraBold),
+)
+
+/**
  * Bold, shadowed, letter-spaced, all-caps HUD text reading as game overlay copy rather than
  * default Material body text. [loud] is for headline-weight lines (titles, ranks); the default
  * weight is for secondary status/stat readouts.
@@ -57,7 +68,8 @@ fun HudText(
         modifier = modifier,
         color = color,
         fontFamily = hudFontFamily(loud),
-        fontSize = if (loud) 24.sp else 14.sp,
+        // Watch faces are ~200dp across, so HUD copy shrinks there to fit a line or two.
+        fontSize = if (LocalHudLayout.current.watch) (if (loud) 15.sp else 10.sp) else (if (loud) 24.sp else 14.sp),
         letterSpacing = if (loud) 0.3.sp else 0.4.sp,
         textAlign = TextAlign.Center,
         style = TextStyle(
@@ -106,7 +118,8 @@ fun GameButton(
             onClick = onClick,
         )
     }
-    Box(modifier = panelModifier.padding(horizontal = 14.dp, vertical = 7.dp)) {
+    val watch = LocalHudLayout.current.watch
+    Box(modifier = panelModifier.padding(horizontal = if (watch) 10.dp else 14.dp, vertical = if (watch) 5.dp else 7.dp)) {
         content()
     }
 }

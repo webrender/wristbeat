@@ -47,4 +47,8 @@ dependencies {
     implementation(project(":composeApp"))
     implementation(compose.runtime)
     implementation("androidx.activity:activity-compose:1.9.3")
+    // Wear Compose 1.4 is built on Compose 1.7, matching Compose Multiplatform 1.7.x.
+    implementation("androidx.wear.compose:compose-material:1.4.1")
+    implementation("androidx.wear.compose:compose-foundation:1.4.1")
+    implementation("androidx.wear.compose:compose-navigation:1.4.1")
 }

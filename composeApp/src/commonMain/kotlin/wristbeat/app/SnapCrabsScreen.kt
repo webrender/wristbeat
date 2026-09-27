@@ -60,7 +60,7 @@ private const val CYCLE_BEATS = 8.0
  * of time, not just reacted to after the fact.
  */
 @Composable
-fun SnapCrabsScreen(inputOffsetMs: Double, chart: ChartSetting) {
+fun SnapCrabsScreen(inputOffsetMs: Double, chart: ChartSetting, onRunningChanged: (Boolean) -> Unit = {}) {
     val audioClock = remember { AudioClock() }
     val audioEngine = remember { AudioEngine() }
     val haptics = remember { HapticEngine() }
@@ -80,6 +80,8 @@ fun SnapCrabsScreen(inputOffsetMs: Double, chart: ChartSetting) {
     var playerPulsePhase by remember { mutableStateOf(0f) }
     var tally by remember { mutableStateOf(ScoreTally()) }
     val runLengthSeconds = remember { (SNAP_CRABS_END_BEATS * SECONDS_PER_BEAT).roundToInt() }
+    val watch = LocalHudLayout.current.watch
+    ReportRunning(started && !finished, onRunningChanged)
     val highwayCues = remember(stage) { stage.leadCues.map { HighwayNote(it, Color(0xFFDE4636).copy(alpha = 0.75f), 6f) } }
     val highwayTargets = remember(stage) { stage.targets.map { HighwayNote(it, Color(0xFF6FB6FF), 8f) } }
 
@@ -226,7 +228,7 @@ fun SnapCrabsScreen(inputOffsetMs: Double, chart: ChartSetting) {
         }
 
         Column(
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 28.dp),
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = statusBottomPadding),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             when {
@@ -240,10 +242,7 @@ fun SnapCrabsScreen(inputOffsetMs: Double, chart: ChartSetting) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             HudText(rank, loud = true)
                             Spacer(Modifier.height(2.dp))
-                            HudText(
-                                "Perfect ${tally.perfect} · OK ${tally.ok} · Miss ${tally.miss}",
-                                color = Color(0xFFAAB8B5),
-                            )
+                            HudText(tallyLine(tally), color = Color(0xFFAAB8B5))
                             HudText("Tap to try again", color = Color(0xFFAAB8B5))
                         }
                     }
@@ -254,14 +253,21 @@ fun SnapCrabsScreen(inputOffsetMs: Double, chart: ChartSetting) {
                             HudText("Tap to start", loud = true)
                             Spacer(Modifier.height(2.dp))
                             HudText(
-                                "Watch the lead crab snap a pattern, then repeat it one bar later " +
-                                    "(~${runLengthSeconds}s)",
+                                if (watch) {
+                                    "Repeat the lead crab"
+                                } else {
+                                    "Watch the lead crab snap a pattern, then repeat it one bar later " +
+                                        "(~${runLengthSeconds}s)"
+                                },
                                 color = Color(0xFFAAB8B5),
                             )
-                            HudText(
-                                if (inputOffsetMs == 0.0) "Not calibrated" else "Calibrated offset ${formatMs(inputOffsetMs)}",
-                                color = Color(0xFFAAB8B5),
-                            )
+                            // The watch menu shows the offset under Calibrate instead.
+                            if (!watch) {
+                                HudText(
+                                    if (inputOffsetMs == 0.0) "Not calibrated" else "Calibrated offset ${formatMs(inputOffsetMs)}",
+                                    color = Color(0xFFAAB8B5),
+                                )
+                            }
                         }
                     }
                 }
@@ -270,10 +276,7 @@ fun SnapCrabsScreen(inputOffsetMs: Double, chart: ChartSetting) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             HudText(sectionLabel(beatPosition), loud = true)
                             Spacer(Modifier.height(2.dp))
-                            HudText(
-                                "Perfect ${tally.perfect} · OK ${tally.ok} · Miss ${tally.miss}",
-                                color = Color(0xFFAAB8B5),
-                            )
+                            HudText(tallyLine(tally), color = Color(0xFFAAB8B5))
                         }
                     }
                 }

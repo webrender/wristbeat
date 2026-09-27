@@ -5,7 +5,7 @@ art. `HANDOFF.md` is the original design brief Jeremy wrote before implementatio
 still useful for the *why* (hard requirements, scaling rules, input mapping, backlog), but treat it
 as historical intent, not current status. Some of it is already resolved (the architecture decision
 it asks you to make with Jeremy has been made — see below) and some of it hasn't been built yet
-(a chart format/editor, Wear-specific UI). This file is the living status doc.
+(a chart format/editor). This file is the living status doc.
 
 `wristbeat-prototype.html` is the original single-file HTML/Canvas/Web Audio prototype Jeremy built
 to try out the feel. It's a useful reference for art and sound design (e.g. `drawCrab`, `SND.bass`)
@@ -45,8 +45,9 @@ build and launch the shared `App()`), but their platform actuals are placeholder
     on web. Pure Kotlin/JVM — no NDK/Oboe yet. The stream pauses (and the clock holds) while the
     app is backgrounded. `WristbeatAndroid.init(context)` supplies the `Context` and registers that
     lifecycle hook, since the `expect` classes take no constructor args.
-- **`androidApp/`**, **`wearApp/`** — thin `com.android.application` shells (`MainActivity` →
-  `App()`). `wearApp` declares `android.hardware.type.watch` and is standalone; minSdk 30.
+- **`androidApp/`**, **`wearApp/`** — thin `com.android.application` shells. `androidApp`'s
+  `MainActivity` → `App()`. `wearApp` declares `android.hardware.type.watch` and is standalone
+  (minSdk 30); its `MainActivity` → `WearApp()` (see **Watch UI** below).
 
 Timing is judged against the audio clock (`AudioClock.now()`), not frame time — taps are converted
 into the same timebase before judging, per HANDOFF's timing-accuracy requirement.
@@ -104,6 +105,17 @@ into the same timebase before judging, per HANDOFF's timing-accuracy requirement
     shape or plain `Modifier.background()` chip — those read as web chips, not game UI, which is
     exactly what this replaced.
 
+- **Watch UI** (`wearApp/.../WearApp.kt`) — the phone/web tabs and top HUD took up the whole
+  watch face, so the watch has its own shell built on Wear Compose Material 1.4 (matches Compose
+  1.7; Wear Material 3 would need a newer Compose). A native menu (`ScalingLazyColumn` of `Chip`s,
+  `TimeText`, and a `ToggleChip` for the chart) picks a stage, with the calibration offset under
+  Calibrate. Each stage opens full screen via `SwipeDismissableNavHost`; swiping right returns to the
+  menu, except mid-run (swipe-to-dismiss is disabled while a run is in progress, since a sloppy tap
+  or a Mango Chop slice would otherwise quit). The screen stays on during a run. Stages render
+  through `App.kt`'s `WatchStageScreen`, which sets `HudLayout(watch = true)`: `StageHeader` draws
+  nothing, HUD text and chips shrink, and status panels drop to the lines that fit on a round face
+  (`tallyLine`, `statusBottomPadding`). Stage screens report runs via `ReportRunning`.
+
 ## Build, test, run
 
 - Unit tests (fast, no browser needed): `./gradlew :core:jvmTest`
@@ -141,7 +153,7 @@ screenshot check. Say so explicitly rather than claiming a visual change looks r
 
 An Oboe/AAudio (native) audio path — Android audio currently runs on a Java `AudioTrack`, which
 works but may have more output latency on some devices — any Wear-specific UI (round-screen
-layout, Wear Compose), a chart format/editor (charts are currently hard-coded Kotlin, e.g.
+layout beyond the menu and HUD trimming above, e.g. stage art tuned for a round face), a chart format/editor (charts are currently hard-coded Kotlin, e.g.
 `Charts.snapCrabsBacking`), and per-device/per-audio-route calibration storage. None
 of these are in progress — don't start them without Jeremy asking, per his stated plan to dial in
 the web app first.
