@@ -12,8 +12,18 @@ expect class AudioClock() {
     fun now(): Double
 
     /**
-     * Converts a raw input-event timestamp (the platform's event timebase, e.g. a JS
-     * PointerEvent.timeStamp in ms) into the same audio-clock timebase as [now], in seconds.
+     * What [now] read at the moment of an input event, given the event's own timestamp
+     * (`PointerInputChange.uptimeMillis`: the DOM `event.timeStamp` on web, `MotionEvent`'s event
+     * time on Android). Judging a tap by when the finger landed rather than when its handler ran
+     * keeps phones' frame-batched touch delivery from adding up to a frame of random lateness to
+     * every tap. Falls back to [now] if the timestamp doesn't look like it's in that timebase.
      */
-    fun audibleTimeForInputEvent(eventTimestampMs: Double): Double
+    fun timeAtInputEvent(eventUptimeMillis: Long): Double
 }
+
+/** Older than this, an event timestamp is more likely in the wrong timebase than really that stale. */
+internal const val MAX_INPUT_AGE_MS = 250.0
+
+/** A tap arriving at [now] that happened [elapsedMs] ago, per [AudioClock.timeAtInputEvent]. */
+internal fun backdate(now: Double, elapsedMs: Double): Double =
+    if (elapsedMs in 0.0..MAX_INPUT_AGE_MS) now - elapsedMs / 1000.0 else now

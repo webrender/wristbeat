@@ -11,6 +11,6 @@ actual class AudioClock actual constructor() {
     actual fun now(): Double = AndroidAudio.now()
 
     // Android input events are stamped in SystemClock.uptimeMillis().
-    actual fun audibleTimeForInputEvent(eventTimestampMs: Double): Double =
-        now() - (SystemClock.uptimeMillis() - eventTimestampMs) / 1000.0
+    actual fun timeAtInputEvent(eventUptimeMillis: Long): Double =
+        backdate(now(), (SystemClock.uptimeMillis() - eventUptimeMillis).toDouble())
 }

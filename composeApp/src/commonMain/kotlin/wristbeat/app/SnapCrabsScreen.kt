@@ -1,7 +1,8 @@
 package wristbeat.app
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -143,13 +144,14 @@ fun SnapCrabsScreen(
         started = true
     }
 
-    fun handleTap() {
+    fun handleTap(eventUptimeMillis: Long? = null) {
         if (!started || finished) {
             restart()
             return
         }
         val now = audioClock.now()
-        val beat = (now - t0) / SECONDS_PER_BEAT
+        val tapTime = eventUptimeMillis?.let(audioClock::timeAtInputEvent) ?: now
+        val beat = (tapTime - t0) / SECONDS_PER_BEAT
         val outcome = stage.recordTap(beat)
         audioEngine.play(SoundId.PLAYER_SNAP, now)
         when (outcome?.grade) {
@@ -170,10 +172,10 @@ fun SnapCrabsScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .then(rememberTapKeyModifier(::handleTap))
-            // onPress, not onTap: judge when the finger lands, not when it lifts, so the offset
+            .then(rememberTapKeyModifier(onTap = { handleTap() }))
+            // Judged when the finger lands (at the down event's own timestamp), not when it lifts, so the offset
             // Calibrate measures doesn't include how long each tap is held.
-            .pointerInput(Unit) { detectTapGestures(onPress = { handleTap() }) },
+            .pointerInput(Unit) { awaitEachGesture { handleTap(awaitFirstDown().uptimeMillis) } },
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             drawSnapCrabsScene(

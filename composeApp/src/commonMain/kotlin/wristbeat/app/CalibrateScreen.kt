@@ -1,7 +1,8 @@
 package wristbeat.app
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -125,12 +126,13 @@ fun CalibrateScreen(calibration: Calibration, onRunningChanged: (Boolean) -> Uni
         started = true
     }
 
-    fun handleTap() {
+    fun handleTap(eventUptimeMillis: Long? = null) {
         if (!started || finished) {
             restart()
             return
         }
-        val beat = (audioClock.now() - t0) / SECONDS_PER_BEAT
+        val tapTime = eventUptimeMillis?.let(audioClock::timeAtInputEvent) ?: audioClock.now()
+        val beat = (tapTime - t0) / SECONDS_PER_BEAT
         val errorMs = stage.recordTap(beat)
         haptics.pulse() // confirms the tap registered; never plays a sound here (see class doc)
         if (errorMs != null) recentErrors = (recentErrors + errorMs).takeLast(16)
@@ -144,10 +146,10 @@ fun CalibrateScreen(calibration: Calibration, onRunningChanged: (Boolean) -> Uni
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .then(rememberTapKeyModifier(::handleTap))
-            // onPress, not onTap: judge when the finger lands, not when it lifts, so the offset
+            .then(rememberTapKeyModifier(onTap = { handleTap() }))
+            // Judged when the finger lands (at the down event's own timestamp), not when it lifts, so the offset
             // Calibrate measures doesn't include how long each tap is held.
-            .pointerInput(Unit) { detectTapGestures(onPress = { handleTap() }) },
+            .pointerInput(Unit) { awaitEachGesture { handleTap(awaitFirstDown().uptimeMillis) } },
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val squareExtent = minOf(size.width, size.height)

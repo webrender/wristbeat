@@ -150,6 +150,9 @@ fun BongoBlitzScreen(
 
     fun beatNow(): Double = (audioClock.now() - t0) / secondsPerBeat
 
+    /** The beat when a pointer event happened, from its timestamp (see [AudioClock.timeAtInputEvent]). */
+    fun beatAt(eventUptimeMillis: Long): Double = (audioClock.timeAtInputEvent(eventUptimeMillis) - t0) / secondsPerBeat
+
     fun restart() {
         audioClock.start()
         calibration.refreshOutput()
@@ -229,14 +232,14 @@ fun BongoBlitzScreen(
                 val swipeDistance = 24.dp.toPx()
                 awaitEachGesture {
                     val down = awaitFirstDown()
-                    val beatAtDown = beatNow()
+                    val beatAtDown = beatAt(down.uptimeMillis)
                     val result = press(beatAtDown)
                     if (result == BongoPressResult.CONSUMED) return@awaitEachGesture
                     while (true) {
                         val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: return@awaitEachGesture
                         val delta = change.position - down.position
                         if (delta.getDistance() >= swipeDistance) {
-                            act(DrumAction.SWIPE, beatNow())
+                            act(DrumAction.SWIPE, beatAt(change.uptimeMillis))
                             return@awaitEachGesture
                         }
                         if (!change.pressed) {
