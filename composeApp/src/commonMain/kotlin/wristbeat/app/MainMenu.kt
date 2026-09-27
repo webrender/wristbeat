@@ -116,6 +116,7 @@ private fun menuSubtitle(stage: Stage, calibration: Calibration): String = when 
     Stage.CALIBRATE -> calibration.statusLine()
     Stage.SNAP_CRABS -> "Repeat the lead crab"
     Stage.MANGO_CHOP -> "Tap to chop, swipe to slice"
+    Stage.BONGO_BLITZ -> "Tap and swipe — copy the monkey's beat"
 }
 
 @Composable

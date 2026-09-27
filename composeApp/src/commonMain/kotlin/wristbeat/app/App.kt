@@ -23,6 +23,7 @@ enum class Stage(val label: String, val enabled: Boolean) {
     CALIBRATE("Calibrate", enabled = true),
     SNAP_CRABS("Snap Crabs", enabled = true),
     MANGO_CHOP("Mango Chop", enabled = true),
+    BONGO_BLITZ("Bongo Blitz", enabled = true),
 }
 
 /** Each stage's accent color, shared by the main menu here and the Wear menu in `wearApp`. */
@@ -31,6 +32,7 @@ val Stage.accent: Color
         Stage.CALIBRATE -> Color(0xFF2FBF9E)
         Stage.SNAP_CRABS -> Color(0xFFF07A5E)
         Stage.MANGO_CHOP -> Color(0xFFFFB320)
+        Stage.BONGO_BLITZ -> Color(0xFFC77DFF)
     }
 
 /**
@@ -43,9 +45,10 @@ internal expect fun StageBackHandler(enabled: Boolean, onBack: () -> Unit)
 /**
  * No app chrome while a stage is being played: picking a stage, toggling the chart and reading the
  * calibration offset all happen in [MainMenu] instead, so each stage screen is just the game itself.
- * Getting back to the menu is a gesture, not a button — Escape on the browser, the system back
- * gesture/button on Android — and only works while nothing is running, so it can't be hit by
- * accident mid-run.
+ * Getting back to the menu is a gesture, not a button — the system back gesture/button on Android,
+ * swipe-to-dismiss on the watch — and, for those, only works while nothing is running, so a sloppy
+ * tap or swipe mid-run can't be mistaken for one. Escape on the browser is a deliberate keypress
+ * rather than a gesture that can be thrown accidentally, so it quits a song in progress too.
  */
 @Composable
 fun App() {
@@ -68,7 +71,7 @@ fun App() {
                 .fillMaxSize()
                 .background(Color(0xFF0F1B19))
                 .onKeyEvent { event ->
-                    if (backEnabled && event.type == KeyEventType.KeyDown && event.key == Key.Escape) {
+                    if (stage != null && event.type == KeyEventType.KeyDown && event.key == Key.Escape) {
                         stage = null
                         true
                     } else {
@@ -96,6 +99,7 @@ fun App() {
                         Stage.CALIBRATE -> CalibrateScreen(calibration, onRunningChanged = { running = it }, onMenu = onMenu)
                         Stage.SNAP_CRABS -> SnapCrabsScreen(calibration, chart, onRunningChanged = { running = it }, onMenu = onMenu)
                         Stage.MANGO_CHOP -> MangoChopScreen(calibration, chart, onRunningChanged = { running = it }, onMenu = onMenu)
+                        Stage.BONGO_BLITZ -> BongoBlitzScreen(calibration, chart, onRunningChanged = { running = it }, onMenu = onMenu)
                     }
                 }
             }
@@ -123,6 +127,7 @@ fun WatchStageScreen(
                     Stage.CALIBRATE -> CalibrateScreen(calibration, onRunningChanged)
                     Stage.SNAP_CRABS -> SnapCrabsScreen(calibration, chart, onRunningChanged)
                     Stage.MANGO_CHOP -> MangoChopScreen(calibration, chart, onRunningChanged)
+                    Stage.BONGO_BLITZ -> BongoBlitzScreen(calibration, chart, onRunningChanged)
                 }
             }
         }

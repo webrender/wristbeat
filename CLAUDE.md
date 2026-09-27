@@ -20,26 +20,29 @@ build and launch the shared `App()`), but their platform actuals are placeholder
 - **`core/`** — pure Kotlin, no UI framework, unit-tested (`core/src/commonTest`). Chart data,
   timing/judgment math, and the stage state machines live here so they can be shared and tested
   without a UI.
-  - `Timing.kt` — beat/clock constants (`SECONDS_PER_BEAT` for the shared 116 BPM, `MANGO_CHOP_BPM`).
-    Charts are authored in beats; each stage exposes its own seconds-per-beat where it differs.
+  - `Timing.kt` — beat/clock constants (`SECONDS_PER_BEAT` for the shared 116 BPM, `MANGO_CHOP_BPM`,
+    `BONGO_BLITZ_BPM`). Charts are authored in beats; each stage exposes its own seconds-per-beat
+    where it differs.
   - `Judgment.kt` — `Grade`, `ScoreTally`, `Rank` and the PERFECT/OK/miss math.
   - `Chart.kt` — `SoundId`, `ChartEvent`, and `Charts` (procedural chart generators:
-    `snapCrabsBacking`, the prototype's ukulele band, and `mangoChopBacking`, Mango Chop's own soca
-    song in A minor with keyboard stabs, shaker and a steel pan tune). Each song has a real form,
-    laid out in beats by `SnapCrabsSong`/`MangoChopSong`: a musical intro whose last bar is the
-    stick count-in, verse/chorus sections (plus a bridge with its own progression in Mango Chop)
-    marked by crashes and tom/rim fills, and an outro that lands on a final chord and rings out
-    before the results. Stages place their gameplay on those sections (Snap Crabs' easy patterns
-    in the verse, harder ones in the chorus; Mango Chop's pineapples arrive with the bridge).
-  - `CalibrateStage.kt`, `SnapCrabsStage.kt`, `MangoChopStage.kt` — per-stage state machines
-    (`recordTap`/`recordAction`, `updateMisses`, `tally`, and `perceivedBeat`, which the screens draw
-    at so visuals follow the calibrated offset).
+    `snapCrabsBacking`, the prototype's ukulele band; `mangoChopBacking`, Mango Chop's own soca
+    song in A minor with keyboard stabs, shaker and a steel pan tune; and `bongoBlitzBacking`, a lean
+    jungle percussion groove that stays out of the way of Bongo Blitz's calls). Each song has a real
+    form, laid out in beats by `SnapCrabsSong`/`MangoChopSong`/`BongoBlitzSong`: a musical intro whose
+    last bar is the stick count-in, verse/chorus sections (plus a bridge with its own progression in
+    Mango Chop and Bongo Blitz) marked by crashes and tom/rim fills, and an outro that lands on a
+    final chord and rings out before the results. Stages place their gameplay on those sections
+    (Snap Crabs' easy patterns in the verse, harder ones in the chorus; Mango Chop's pineapples and
+    Bongo Blitz's low-drum swipes both arrive with the bridge).
+  - `CalibrateStage.kt`, `SnapCrabsStage.kt`, `MangoChopStage.kt`, `BongoBlitzStage.kt` — per-stage
+    state machines (`recordTap`/`recordAction`, `updateMisses`, `tally`, and `perceivedBeat`, which
+    the screens draw at so visuals follow the calibrated offset).
 - **`composeApp/`** — the Compose UI and platform adapters.
   - `commonMain` — `App.kt` (the home screen vs. stage switch, and the `StageBackHandler` expect
     declaration for the back gesture that returns to the menu),
     `MainMenu.kt` (the phone/web home screen: pick a stage, toggle the chart, see the calibration
     offset — the mobile/web counterpart to `wearApp`'s native menu), `CalibrateScreen.kt`,
-    `SnapCrabsScreen.kt`, `MangoChopScreen.kt`,
+    `SnapCrabsScreen.kt`, `MangoChopScreen.kt`, `BongoBlitzScreen.kt`,
     `Hud.kt` (shared HUD text/chip styling), `StageHud.kt` (shared HUD bits: the chart toggle,
     `ReportRunning`), `Results.kt` (`StageResults`, the fullscreen wipe-and-count-up screen a run
     transitions into when it ends, playing a cheer/boo sound), `NoteHighway.kt` (the shared note
@@ -73,7 +76,7 @@ into the same timebase before judging, per HANDOFF's timing-accuracy requirement
 ## Current status (playable today, on web)
 
 - **Main menu** (`MainMenu.kt`) — the app opens on a menu, not straight into a stage: pick Calibrate,
-  Snap Crabs or Mango Chop, or toggle the note highway ("chart") on/off, mirroring the native menu
+  Snap Crabs, Mango Chop or Bongo Blitz, or toggle the note highway ("chart") on/off, mirroring the native menu
   `wearApp` already had on the watch. A stage is full-bleed game with no title, tap/swipe
   instructions, or top HUD chrome of its own while it's being played (a tutorial stage will cover
   that explanation later), and its song starts automatically the moment it opens — no tap needed.
@@ -97,7 +100,18 @@ into the same timebase before judging, per HANDOFF's timing-accuracy requirement
   is a stray: it consumes nothing, and the fruit bounces off as a miss if it isn't corrected in time.
   Its note highway shows a single row of each landing (the beat to act on; pineapples as slanted
   swipe arrows), and hides with the same chart toggle.
-- **Results** (`Results.kt`) — Snap Crabs and Mango Chop no longer show a live Perfect/OK/Miss tally
+- **Bongo Blitz** — the hardest stage, at 172 BPM (`Charts.bongoBlitzBacking`, its own lean jungle
+  percussion groove). A monkey claps a call on its high (tap) or low (swipe) drum, and the player
+  repeats it exactly — both rhythm and which drum — one bar later: Snap Crabs' call-and-response
+  memory task, layered with Mango Chop's tap/swipe discrimination, at a faster tempo and with longer,
+  more syncopated eighth-note tap runs than either other stage. The verse is tap-only and the chorus
+  brings in the low drum; both it and the bridge cap every pattern at one swipe, always at least a
+  full beat from the note before and after it, since a swipe (drag clear of the tap distance, then
+  lift and re-touch) takes real time a tap doesn't — a rule `BongoBlitzStageTest` checks directly. The
+  wrong drum is a stray, same as Mango Chop's wrong action: it consumes nothing and can be corrected
+  inside the window. Its note highway shows the upcoming response beats (dots for the high drum,
+  swipe arrows for the low one), and hides with the same chart toggle.
+- **Results** (`Results.kt`) — Snap Crabs, Mango Chop and Bongo Blitz no longer show a live Perfect/OK/Miss tally
   or rank during play; instead, once the song ends, an accent-colored panel wipes fully across the
   screen (`StageResults`'s `wipe` `Animatable`, sliding off to reveal what's behind it), replacing
   the frozen game with an opaque fullscreen backdrop — a radial gradient plus a slow-turning
@@ -117,7 +131,9 @@ into the same timebase before judging, per HANDOFF's timing-accuracy requirement
   Mango Chop's swipe: on touch (and mouse drag) a swipe fires when the pointer moves 24dp. To avoid
   delaying chops, a press chops immediately when the nearest open fruit wants a chop. When a
   pineapple is nearest, the press waits: it slices if it becomes a swipe, and otherwise chops on
-  release, judged at the moment the finger landed. On the keyboard, D/K/arrow keys slice.
+  release, judged at the moment the finger landed. On the keyboard, D/K/arrow keys slice. Bongo
+  Blitz's tap/swipe (hitting the high or low drum) follows the same rule, keyed off its own
+  `expectedAction` instead of Mango Chop's nearest-open-fruit lookup.
 - **Calibration** — Calibrate's offset is saved per audio output (`Calibration.kt`): Android keys it
   by the routed device (the `AudioTrack`'s routed device, or a Bluetooth > wired > speaker guess
   before the stream starts) in `SharedPreferences`; the web can't see the output device, so it keeps

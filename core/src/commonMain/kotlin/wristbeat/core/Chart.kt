@@ -30,6 +30,10 @@ enum class SoundId {
     THUD,
     CRASH,
     TOM,
+    LEAD_BONGO_HI,
+    LEAD_BONGO_LO,
+    PLAYER_BONGO_HI,
+    PLAYER_BONGO_LO,
     CHEER,
     BOO,
 }
@@ -64,6 +68,22 @@ object MangoChopSong {
 
     /** A few beats after [OUTRO]'s final hit, so it rings out before the results come up. */
     const val END = 96.0
+}
+
+/**
+ * Bongo Blitz's song form, in [BONGO_BLITZ_BPM] beats from the start of the run. The intro's last
+ * bar is the stick count-in; the first call lands on [VERSE]. Each of [VERSE], [CHORUS] and
+ * [BRIDGE] holds four 8-beat call-and-response pairs (see `BONGO_PATTERNS` in `BongoBlitzStage.kt`),
+ * so the section boundaries below are exactly 32 beats apart.
+ */
+object BongoBlitzSong {
+    const val VERSE = 12.0
+    const val CHORUS = 44.0
+    const val BRIDGE = 76.0
+    const val OUTRO = 108.0
+
+    /** A few beats after [OUTRO]'s final hit, so it rings out before the results come up. */
+    const val END = 112.0
 }
 
 object Charts {
@@ -331,6 +351,79 @@ object Charts {
         events += finalHit(outro, MANGO_CHORDS[0].first)
         for (note in MANGO_CHORDS[0].second) events += ChartEvent(outro, SoundId.KEYS, note)
         for ((i, note) in listOf(64.0, 69.0, 72.0).withIndex()) events += ChartEvent(outro + i * 0.25, SoundId.STEEL_PAN, note)
+        return events.sortedBy { it.beat }
+    }
+
+    /** An 8-beat marimba riff, one per call-and-response pair, kept simple so it never competes with the calls. */
+    private val BONGO_RIFF: List<Pair<Double, Double>> = listOf(
+        0.0 to 62.0, 1.0 to 65.0, 1.5 to 67.0, 2.5 to 65.0, 3.0 to 62.0,
+        4.0 to 60.0, 4.5 to 62.0, 5.5 to 65.0, 6.0 to 67.0, 7.0 to 70.0,
+    )
+
+    /** Low roots under the groove, cycling every four pairs (32 beats, one section). */
+    private val BONGO_ROOTS = listOf(38.0, 41.0, 43.0, 38.0)
+
+    /**
+     * Bongo Blitz's own backing: a lean jungle percussion groove (kick, rim, shaker, a low bass
+     * thump) that stays out of the way of the monkey's calls, laid out by [BongoBlitzSong]:
+     * - **Intro** — the riff over a droning root and a light shaker, then a bar of sticks over a
+     *   four-on-the-floor kick to count the fast tempo in.
+     * - **Verse** — just kick, rim and shaker under the tap-only calls, so the fast tempo settles in
+     *   before anything else is added.
+     * - **Chorus** — an off-beat hat and the riff return once the low drum joins the calls.
+     * - **Bridge** — a 32nd-note rim-roll pickup into every response bar, building tension under the
+     *   densest patterns.
+     * - **Outro** — a final low hit with a crash and a rising riff flourish.
+     */
+    fun bongoBlitzBacking(): List<ChartEvent> {
+        val events = mutableListOf<ChartEvent>()
+        val verse = BongoBlitzSong.VERSE
+        val chorus = BongoBlitzSong.CHORUS
+        val bridge = BongoBlitzSong.BRIDGE
+        val outro = BongoBlitzSong.OUTRO
+
+        // Intro: two bars of the riff over a droning root and a light shaker, then a bar of sticks
+        // over a four-on-the-floor kick to count the fast tempo in.
+        for (i in 0 until 16) if (i % 2 == 0) events += ChartEvent(i * 0.5, SoundId.SHAKER)
+        for ((offset, note) in BONGO_RIFF) events += ChartEvent(offset, SoundId.KEYS, note)
+        events += ChartEvent(0.0, SoundId.BASS_LONG, BONGO_ROOTS[0])
+        events += ChartEvent(4.0, SoundId.BASS_LONG, BONGO_ROOTS[1])
+        for (i in 8 until 12) {
+            events += ChartEvent(i.toDouble(), SoundId.STICK)
+            events += ChartEvent(i.toDouble(), SoundId.KICK)
+        }
+
+        // Verse, chorus and bridge: a two-bar (8-beat) groove under each call-and-response pair.
+        var b = verse
+        var pairIndex = 0
+        while (b < outro) {
+            val inBridge = b >= bridge
+            val inChorus = b >= chorus && !inBridge
+            val root = BONGO_ROOTS[pairIndex % BONGO_ROOTS.size]
+            events += ChartEvent(b, SoundId.KICK)
+            events += ChartEvent(b + 4, SoundId.KICK)
+            events += ChartEvent(b + 2, SoundId.RIM)
+            events += ChartEvent(b + 6, SoundId.RIM)
+            for (i in 0 until 16) if (i % 2 == 1) events += ChartEvent(b + i * 0.5, SoundId.SHAKER)
+            if (inChorus || inBridge) {
+                for (i in 0 until 16) if (i % 4 == 3) events += ChartEvent(b + i * 0.5, SoundId.HAT)
+                for ((offset, note) in BONGO_RIFF) events += ChartEvent(b + offset, SoundId.KEYS, note)
+            }
+            events += ChartEvent(b, SoundId.BASS_MED, root)
+            events += ChartEvent(b + 4, SoundId.BASS_MED, root)
+            if (inBridge) {
+                // A rim-roll pickup into the response bar, raising the tension under the hardest calls.
+                for (i in 0 until 4) events += ChartEvent(b + 3.5 + i * 0.125, SoundId.RIM)
+            }
+            b += 8
+            pairIndex++
+        }
+        events += ChartEvent(chorus, SoundId.CRASH)
+        events += ChartEvent(bridge, SoundId.CRASH)
+
+        // Outro: the final low hit with a crash, and a rising riff flourish.
+        events += finalHit(outro, BONGO_ROOTS[0])
+        for ((i, note) in listOf(62.0, 67.0, 70.0, 74.0).withIndex()) events += ChartEvent(outro + i * 0.25, SoundId.KEYS, note)
         return events.sortedBy { it.beat }
     }
 }

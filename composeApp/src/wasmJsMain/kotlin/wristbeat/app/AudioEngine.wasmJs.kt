@@ -93,6 +93,25 @@ actual class AudioEngine actual constructor() {
                 jsOscRamp(ctx, "sine", freq, freq * 0.6, atSeconds, 0.004, 0.55, 0.2)
                 jsNoise(ctx, noise, atSeconds, 0.03, 0.1, "bandpass", 1200.0, 1.0)
             }
+            // Bongo Blitz's high (tap) drum: a short, tightly-pitched slap, brighter and louder for
+            // the lead's call than the player's own echo so the two are easy to tell apart by ear.
+            SoundId.LEAD_BONGO_HI -> {
+                jsNoise(ctx, noise, atSeconds, 0.05, 0.55, "bandpass", 1500.0, 4.0)
+                jsOscRamp(ctx, "sine", 620.0, 340.0, atSeconds, 0.003, 0.32, 0.05)
+            }
+            SoundId.PLAYER_BONGO_HI -> {
+                jsNoise(ctx, noise, atSeconds, 0.05, 0.45, "bandpass", 1700.0, 4.0)
+                jsOscRamp(ctx, "sine", 700.0, 380.0, atSeconds, 0.003, 0.26, 0.05)
+            }
+            // The low (swipe) drum: a rounder, lower open tone with a longer decay.
+            SoundId.LEAD_BONGO_LO -> {
+                jsNoise(ctx, noise, atSeconds, 0.09, 0.4, "bandpass", 480.0, 2.5)
+                jsOscRamp(ctx, "sine", 220.0, 130.0, atSeconds, 0.004, 0.4, 0.11)
+            }
+            SoundId.PLAYER_BONGO_LO -> {
+                jsNoise(ctx, noise, atSeconds, 0.09, 0.32, "bandpass", 520.0, 2.5)
+                jsOscRamp(ctx, "sine", 250.0, 150.0, atSeconds, 0.004, 0.32, 0.11)
+            }
             // Results screen stinger for a pass: a bright rising arpeggio over a crowd-like noise whoosh.
             SoundId.CHEER -> {
                 jsNoise(ctx, noise, atSeconds, 0.6, 0.18, "bandpass", 2200.0, 0.6)

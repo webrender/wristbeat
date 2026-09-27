@@ -115,6 +115,7 @@ private fun StageMenu(
                                     Stage.CALIBRATE -> offsetLabel
                                     Stage.SNAP_CRABS -> "Repeat the lead crab"
                                     Stage.MANGO_CHOP -> "Tap to chop, swipe to slice"
+                                    Stage.BONGO_BLITZ -> "Copy the monkey's beat"
                                 },
                             )
                         },

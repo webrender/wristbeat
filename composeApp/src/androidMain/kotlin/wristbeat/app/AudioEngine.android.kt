@@ -81,6 +81,23 @@ actual class AudioEngine actual constructor() {
                 osc(Wave.SINE, freq, t, 0.004, 0.55, 0.2, endFreq = freq * 0.6)
                 noise(t, 0.03, 0.1, FilterType.BANDPASS, 1200.0, 1.0)
             }
+            // Same voicings as AudioEngine.wasmJs.kt's bongo hits.
+            SoundId.LEAD_BONGO_HI -> {
+                noise(t, 0.05, 0.55, FilterType.BANDPASS, 1500.0, 4.0)
+                osc(Wave.SINE, 620.0, t, 0.003, 0.32, 0.05, endFreq = 340.0)
+            }
+            SoundId.PLAYER_BONGO_HI -> {
+                noise(t, 0.05, 0.45, FilterType.BANDPASS, 1700.0, 4.0)
+                osc(Wave.SINE, 700.0, t, 0.003, 0.26, 0.05, endFreq = 380.0)
+            }
+            SoundId.LEAD_BONGO_LO -> {
+                noise(t, 0.09, 0.4, FilterType.BANDPASS, 480.0, 2.5)
+                osc(Wave.SINE, 220.0, t, 0.004, 0.4, 0.11, endFreq = 130.0)
+            }
+            SoundId.PLAYER_BONGO_LO -> {
+                noise(t, 0.09, 0.32, FilterType.BANDPASS, 520.0, 2.5)
+                osc(Wave.SINE, 250.0, t, 0.004, 0.32, 0.11, endFreq = 150.0)
+            }
             // Same voicings as AudioEngine.wasmJs.kt's CHEER/BOO.
             SoundId.CHEER -> {
                 noise(t, 0.6, 0.18, FilterType.BANDPASS, 2200.0, 0.6)
