@@ -114,7 +114,8 @@ into the same timebase before judging, per HANDOFF's timing-accuracy requirement
   or a Mango Chop slice would otherwise quit). The screen stays on during a run. Stages render
   through `App.kt`'s `WatchStageScreen`, which sets `HudLayout(watch = true)`: `StageHeader` draws
   nothing, HUD text and chips shrink, and status panels drop to the lines that fit on a round face
-  (`tallyLine`, `statusBottomPadding`). Stage screens report runs via `ReportRunning`.
+  (`tallyLine`, `statusBottomPadding`). The start instructions and in-run prompt fade out 3s after
+  they appear (`WatchAutoHide`); results stay up, and so does Calibrate's timing strip. Stage screens report runs via `ReportRunning`.
 
 ## Build, test, run
 

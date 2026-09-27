@@ -209,7 +209,7 @@ fun CalibrateScreen(onCalibrated: (offsetMs: Double) -> Unit, onRunningChanged: 
                         }
                     }
                 }
-                !started -> {
+                !started -> WatchAutoHide("idle") {
                     HudChip {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             HudText("Tap to start", loud = true)
@@ -228,16 +228,19 @@ fun CalibrateScreen(onCalibrated: (offsetMs: Double) -> Unit, onRunningChanged: 
                 }
                 else -> {
                     val beatIndex = floor(beatPosition).toInt()
-                    HudChip {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            HudText(if (beatIndex < CALIBRATE_COUNT_IN_BEATS) "Get ready…" else "Tap with the click", loud = true)
-                            Spacer(Modifier.height(2.dp))
-                            val shownBeat = beatIndex.coerceIn(0, CALIBRATE_TOTAL_BEATS)
-                            HudText(
-                                if (watch) "Beat $shownBeat/$CALIBRATE_TOTAL_BEATS · $tapCount taps"
-                                else "Beat $shownBeat of $CALIBRATE_TOTAL_BEATS  ·  $tapCount taps",
-                                color = Color(0xFFAAB8B5),
-                            )
+                    // The timing strip stays up on a watch; only the prompt fades.
+                    WatchAutoHide("run") {
+                        HudChip {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                HudText(if (beatIndex < CALIBRATE_COUNT_IN_BEATS) "Get ready…" else "Tap with the click", loud = true)
+                                Spacer(Modifier.height(2.dp))
+                                val shownBeat = beatIndex.coerceIn(0, CALIBRATE_TOTAL_BEATS)
+                                HudText(
+                                    if (watch) "Beat $shownBeat/$CALIBRATE_TOTAL_BEATS · $tapCount taps"
+                                    else "Beat $shownBeat of $CALIBRATE_TOTAL_BEATS  ·  $tapCount taps",
+                                    color = Color(0xFFAAB8B5),
+                                )
+                            }
                         }
                     }
                     Spacer(Modifier.height(8.dp))

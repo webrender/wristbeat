@@ -300,7 +300,7 @@ fun MangoChopScreen(inputOffsetMs: Double, chart: ChartSetting, onRunningChanged
                         }
                     }
                 }
-                !started -> {
+                !started -> WatchAutoHide("idle") {
                     HudChip {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             HudText("Tap to start", loud = true)
@@ -323,7 +323,7 @@ fun MangoChopScreen(inputOffsetMs: Double, chart: ChartSetting, onRunningChanged
                         }
                     }
                 }
-                else -> {
+                else -> WatchAutoHide("run") {
                     HudChip {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             HudText(if (beatPosition < 4.0) "Get ready…" else "Chop on the landing", loud = true)

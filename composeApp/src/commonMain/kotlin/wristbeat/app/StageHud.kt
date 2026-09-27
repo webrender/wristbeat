@@ -10,17 +10,24 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import wristbeat.core.ScoreTally
 
 /** Below this width the stage tabs and a stage's top HUD can't share the top edge side by side. */
@@ -84,6 +91,28 @@ internal fun BoxScope.StageHeader(
             if (legend != null) HudChip { legend() }
         }
     }
+}
+
+/** How long a stage's instructions stay up on a watch before fading, so they don't cover the game. */
+private const val WATCH_INSTRUCTIONS_MS = 3000L
+
+/**
+ * On a watch, shows [content] when it first appears (and again whenever [key] changes), then fades
+ * it out after [WATCH_INSTRUCTIONS_MS]; the small round face can't spare room for instructions
+ * that stay up. Elsewhere [content] just stays.
+ */
+@Composable
+internal fun WatchAutoHide(key: Any, content: @Composable () -> Unit) {
+    if (!LocalHudLayout.current.watch) {
+        content()
+        return
+    }
+    var visible by remember(key) { mutableStateOf(true) }
+    LaunchedEffect(key) {
+        delay(WATCH_INSTRUCTIONS_MS)
+        visible = false
+    }
+    AnimatedVisibility(visible = visible, enter = fadeIn(), exit = fadeOut()) { content() }
 }
 
 /** Distance of a stage's bottom status panel from the screen edge; higher on a watch, where a round face narrows toward the bottom. */

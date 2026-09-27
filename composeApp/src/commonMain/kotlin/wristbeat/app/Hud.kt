@@ -69,7 +69,7 @@ fun HudText(
         color = color,
         fontFamily = hudFontFamily(loud),
         // Watch faces are ~200dp across, so HUD copy shrinks there to fit a line or two.
-        fontSize = if (LocalHudLayout.current.watch) (if (loud) 15.sp else 10.sp) else (if (loud) 24.sp else 14.sp),
+        fontSize = if (LocalHudLayout.current.watch) (if (loud) 13.sp else 9.sp) else (if (loud) 24.sp else 14.sp),
         letterSpacing = if (loud) 0.3.sp else 0.4.sp,
         textAlign = TextAlign.Center,
         style = TextStyle(

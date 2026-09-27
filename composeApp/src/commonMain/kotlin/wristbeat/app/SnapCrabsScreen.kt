@@ -247,7 +247,7 @@ fun SnapCrabsScreen(inputOffsetMs: Double, chart: ChartSetting, onRunningChanged
                         }
                     }
                 }
-                !started -> {
+                !started -> WatchAutoHide("idle") {
                     HudChip {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             HudText("Tap to start", loud = true)
@@ -271,7 +271,7 @@ fun SnapCrabsScreen(inputOffsetMs: Double, chart: ChartSetting, onRunningChanged
                         }
                     }
                 }
-                else -> {
+                else -> WatchAutoHide("run") {
                     HudChip {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             HudText(sectionLabel(beatPosition), loud = true)
