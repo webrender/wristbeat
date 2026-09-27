@@ -35,23 +35,25 @@ jobs:
             echo "::warning::DEBUG_KEYSTORE_BASE64 is not set; APKs use a throwaway key and won't install over earlier releases."
           fi
 
-      - name: Build debug APKs
-        run: ./gradlew :androidApp:assembleDebug :wearApp:assembleDebug
+      # Release builds (R8-optimized, non-debuggable) signed with the same stable key as before,
+      # so they install over earlier debug releases.
+      - name: Build release APKs
+        run: ./gradlew :androidApp:assembleRelease :wearApp:assembleRelease
 
       - name: Name APKs
         run: |
           mkdir dist
-          cp androidApp/build/outputs/apk/debug/androidApp-debug.apk dist/wristbeat-android.apk
-          cp wearApp/build/outputs/apk/debug/wearApp-debug.apk dist/wristbeat-wear.apk
+          cp androidApp/build/outputs/apk/release/androidApp-release.apk dist/wristbeat-android.apk
+          cp wearApp/build/outputs/apk/release/wearApp-release.apk dist/wristbeat-wear.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: wristbeat-android-debug
+          name: wristbeat-android
           path: dist/wristbeat-android.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: wristbeat-wear-debug
+          name: wristbeat-wear
           path: dist/wristbeat-wear.apk
 
       - name: Publish release
@@ -61,7 +63,7 @@ jobs:
         run: |
           short_sha="${GITHUB_SHA::7}"
           {
-            echo "Debug build of \`$short_sha\` on main."
+            echo "Release build of \`$short_sha\` on main."
             echo
             echo '```'
             git log -1 --format=%B

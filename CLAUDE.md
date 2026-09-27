@@ -108,9 +108,9 @@ into the same timebase before judging, per HANDOFF's timing-accuracy requirement
 
 - Unit tests (fast, no browser needed): `./gradlew :core:jvmTest`
 - Compile check: `./gradlew :composeApp:compileKotlinWasmJs`
-- Debug APKs: `./gradlew :androidApp:assembleDebug :wearApp:assembleDebug` (needs an Android SDK;
+- APKs: `./gradlew :androidApp:assembleRelease :wearApp:assembleRelease` (or `assembleDebug`; needs an Android SDK;
   `local.properties` with `sdk.dir` is gitignored).
-- CI: `.github/workflows/android.yml` runs the core tests and builds both debug APKs on every push to
+- CI: `.github/workflows/android.yml` runs the core tests and builds both release APKs (R8-optimized, signed with the debug key) on every push to
   `main`, then publishes a GitHub Release tagged `build-<run number>` with `wristbeat-android.apk`
   and `wristbeat-wear.apk` (stable link: `releases/latest/download/<name>.apk`). versionCode is the
   run number. CI signs with the `DEBUG_KEYSTORE_BASE64` repo secret when set so releases install
