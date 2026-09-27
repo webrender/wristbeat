@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Launcher icon art in the inked stage-art style, drawn on the 108dp adaptive-icon canvas. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:pathData="M46.71,65.47L46.71,40.5L71.55,34.42L71.55,61.42L68.31,61.42L68.31,42.65L49.95,47.13L49.95,65.47Z"
+        android:fillColor="#000000" />
+    <path
+        android:pathData="M35.52,68.31A7.56,5.54 -22 1,1 49.53,62.64A7.56,5.54 -22 1,1 35.52,68.31Z"
+        android:fillColor="#000000" />
+    <path
+        android:pathData="M57.12,64.26A7.56,5.54 -22 1,1 71.13,58.59A7.56,5.54 -22 1,1 57.12,64.26Z"
+        android:fillColor="#000000" />
+</vector>
