@@ -1,7 +1,6 @@
 package wristbeat.app
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,11 +9,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -24,12 +20,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import kotlin.math.PI
@@ -153,40 +155,121 @@ fun CalibrateScreen(calibration: Calibration, onRunningChanged: (Boolean) -> Uni
             val radius = squareExtent / 2f * 0.85f
             val safeRadius = radius * 0.85f
 
-            drawCalibrateBackground(size.width, size.height, stageCenter, radius * 1.35f)
+            val u = radius / 200f
 
-            drawCircle(color = Color(0xFF0E3A3D), radius = radius, center = stageCenter)
-            drawCircle(color = Color.White.copy(alpha = 0.10f), radius = safeRadius, center = stageCenter, style = Stroke(width = 3f))
+            drawCalibrateBackground(size.width, size.height, stageCenter, radius * 1.35f, flashPhase)
+
+            // Bezel: an inked, shaded rim around the dial face.
+            drawCircle(Color.Black.copy(alpha = 0.35f), radius = radius + 6f * u, center = stageCenter + Offset(0f, 8f * u))
+            drawCircle(
+                brush = Brush.verticalGradient(listOf(Color(0xFF3A6E68), Color(0xFF123331)), startY = stageCenter.y - radius, endY = stageCenter.y + radius),
+                radius = radius,
+                center = stageCenter,
+            )
+            drawCircle(CAL_INK, radius = radius, center = stageCenter, style = Stroke(width = 4f * u))
+            drawCircle(
+                brush = Brush.radialGradient(
+                    listOf(Color(0xFF184A48), Color(0xFF0C2826)),
+                    center = stageCenter - Offset(0f, radius * 0.3f),
+                    radius = radius,
+                ),
+                radius = radius * 0.9f,
+                center = stageCenter,
+            )
+            drawCircle(CAL_INK, radius = radius * 0.9f, center = stageCenter, style = Stroke(width = 3f * u))
 
             // Progress ring: how far through the fixed-length run we are, so "how long is this"
             // has a visible answer instead of just a number.
+            val ringRadius = radius * 0.95f
+            val ringTopLeft = Offset(stageCenter.x - ringRadius, stageCenter.y - ringRadius)
+            val ringSize = Size(ringRadius * 2f, ringRadius * 2f)
+            drawCircle(Color.Black.copy(alpha = 0.3f), radius = ringRadius, center = stageCenter, style = Stroke(width = 7f * u))
             if (started) {
                 val progress = (beatPosition / CALIBRATE_TOTAL_BEATS).coerceIn(0.0, 1.0).toFloat()
-                drawArc(
-                    color = Color(0xFF2FBF9E),
-                    startAngle = -90f,
-                    sweepAngle = progress * 360f,
-                    useCenter = false,
-                    topLeft = Offset(stageCenter.x - radius + 3f, stageCenter.y - radius + 3f),
-                    size = Size((radius - 3f) * 2f, (radius - 3f) * 2f),
-                    style = Stroke(width = 5f),
+                if (progress > 0f) {
+                    drawArc(Color(0xFF2FBF9E).copy(alpha = 0.35f), -90f, progress * 360f, false, ringTopLeft, ringSize, style = Stroke(width = 13f * u, cap = StrokeCap.Round))
+                    drawArc(Color(0xFF7FF0CF), -90f, progress * 360f, false, ringTopLeft, ringSize, style = Stroke(width = 6f * u, cap = StrokeCap.Round))
+                }
+            }
+
+            // Ticks for the quarter-beats around the face, like a stopwatch.
+            for (i in 0 until 16) {
+                val a = (-90f + i * 22.5f) * PI.toFloat() / 180f
+                val d = Offset(cos(a), sin(a))
+                val major = i % 4 == 0
+                drawLine(
+                    Color.White.copy(alpha = if (major) 0.35f else 0.14f),
+                    stageCenter + d * (radius * (if (major) 0.74f else 0.79f)),
+                    stageCenter + d * (radius * 0.84f),
+                    strokeWidth = (if (major) 4f else 2.5f) * u,
+                    cap = StrokeCap.Round,
                 )
             }
 
             // Anticipatory sweep: one full revolution per beat, arriving at the target
-            // mark (12 o'clock) exactly when the click plays.
+            // mark (12 o'clock) exactly when the click plays, with a fading trail behind it.
             val phase = if (beatPosition < 0) 0.0 else beatPosition - floor(beatPosition)
-            val angle = (-90f + phase.toFloat() * 360f) * (PI.toFloat() / 180f)
+            val sweepDeg = -90f + phase.toFloat() * 360f
+            val angle = sweepDeg * (PI.toFloat() / 180f)
             val marker = Offset(stageCenter.x + safeRadius * cos(angle), stageCenter.y + safeRadius * sin(angle))
             if (started && !finished) {
-                drawLine(Color(0xFFFFB320), stageCenter, marker, strokeWidth = 4f)
-                drawCircle(Color(0xFFFFB320), radius = 8f, center = marker)
+                // A sweep gradient always starts at 3 o'clock, so the trail is drawn from 0° and
+                // rotated into place behind the hand, fading in from its tail.
+                val trail = 110f
+                withTransform({ rotate(sweepDeg - trail, stageCenter) }) {
+                    drawArc(
+                        brush = Brush.sweepGradient(
+                            0f to Color(0xFFFFB320).copy(alpha = 0f),
+                            trail / 360f to Color(0xFFFFB320).copy(alpha = 0.32f),
+                            1f to Color(0xFFFFB320).copy(alpha = 0f),
+                            center = stageCenter,
+                        ),
+                        startAngle = 0f,
+                        sweepAngle = trail,
+                        useCenter = true,
+                        topLeft = Offset(stageCenter.x - safeRadius, stageCenter.y - safeRadius),
+                        size = Size(safeRadius * 2f, safeRadius * 2f),
+                    )
+                }
+                val dir = Offset(cos(angle), sin(angle))
+                val n = Offset(-dir.y, dir.x)
+                val hand = Path().apply {
+                    moveTo(stageCenter.x + n.x * 7f * u, stageCenter.y + n.y * 7f * u)
+                    lineTo(marker.x, marker.y)
+                    lineTo(stageCenter.x - n.x * 7f * u, stageCenter.y - n.y * 7f * u)
+                    close()
+                }
+                drawPath(hand, CAL_INK, style = Stroke(width = 5f * u, join = StrokeJoin.Round))
+                drawPath(hand, Color(0xFFFFB320))
+                drawCircle(CAL_INK, radius = 11f * u, center = marker)
+                drawCircle(Color(0xFFFFD36A), radius = 8.5f * u, center = marker)
             }
+            drawCircle(CAL_INK, radius = 16f * u, center = stageCenter)
+            drawCircle(brush = Brush.radialGradient(listOf(Color(0xFFFFE8A8), Color(0xFFE0A020)), center = stageCenter - Offset(4f * u, 4f * u), radius = 16f * u), radius = 12.5f * u, center = stageCenter)
 
-            // Target mark flashes exactly on the beat, giving a second, reactive confirmation.
+            // Target mark: a gem at 12 o'clock that flares exactly on the beat, giving a second,
+            // reactive confirmation.
             val target = Offset(stageCenter.x, stageCenter.y - safeRadius)
-            drawCircle(Color.White, radius = 10f + 16f * flashPhase, center = target, alpha = 0.20f + 0.55f * flashPhase)
-            drawCircle(Color.White, radius = 6f, center = target)
+            drawCircle(
+                brush = Brush.radialGradient(
+                    listOf(Color.White.copy(alpha = 0.2f + 0.6f * flashPhase), Color.White.copy(alpha = 0f)),
+                    center = target,
+                    radius = (26f + 30f * flashPhase) * u,
+                ),
+                radius = (26f + 30f * flashPhase) * u,
+                center = target,
+            )
+            val gemR = (13f + 5f * flashPhase) * u
+            val gem = Path().apply {
+                moveTo(target.x, target.y - gemR)
+                lineTo(target.x + gemR, target.y)
+                lineTo(target.x, target.y + gemR)
+                lineTo(target.x - gemR, target.y)
+                close()
+            }
+            drawPath(gem, lerp(Color(0xFFBDF7E6), Color.White, flashPhase))
+            drawPath(gem, CAL_INK, style = Stroke(width = 3f * u, join = StrokeJoin.Round))
+            drawLine(Color.White, Offset(target.x - gemR * 0.4f, target.y - gemR * 0.15f), Offset(target.x - gemR * 0.1f, target.y - gemR * 0.5f), strokeWidth = 2.2f * u, cap = StrokeCap.Round)
         }
 
         // The timing strip is live feedback on the run itself (like the other stages' note
@@ -217,23 +300,31 @@ fun CalibrateScreen(calibration: Calibration, onRunningChanged: (Boolean) -> Uni
     }
 }
 
+private val CAL_INK = Color(0xFF051412)
+
+/**
+ * The last taps' timing on an inked track: a shaded "perfect" zone in the middle, a centre line,
+ * and one dot per tap (green inside the perfect window, amber outside), the newest drawn biggest.
+ */
 @Composable
 private fun TimingStrip(errors: List<Double>) {
-    val width = if (LocalHudLayout.current.watch) 110.dp else 200.dp
-    Box(modifier = Modifier.width(width).height(20.dp).background(Color.White.copy(alpha = 0.08f))) {
-        for (err in errors) {
+    val width = if (LocalHudLayout.current.watch) 110.dp else 220.dp
+    Canvas(modifier = Modifier.width(width).height(if (LocalHudLayout.current.watch) 16.dp else 24.dp)) {
+        val h = size.height
+        val corner = CornerRadius(h * 0.35f)
+        drawRoundRect(Color(0xFF0C2826).copy(alpha = 0.9f), cornerRadius = corner)
+        val zone = (PERFECT_WINDOW_MS / 120.0).toFloat() * size.width / 2f
+        drawRect(Color(0xFF2FBF9E).copy(alpha = 0.22f), topLeft = Offset(size.width / 2f - zone, 0f), size = Size(zone * 2f, h))
+        drawLine(Color.White.copy(alpha = 0.5f), Offset(size.width / 2f, h * 0.15f), Offset(size.width / 2f, h * 0.85f), strokeWidth = 2f)
+        drawRoundRect(CAL_INK, cornerRadius = corner, style = Stroke(width = 2.5f))
+        for ((i, err) in errors.withIndex()) {
             val clamped = err.coerceIn(-120.0, 120.0)
-            val fraction = ((clamped + 120.0) / 240.0).toFloat()
-            Box(
-                modifier = Modifier
-                    .offset(x = width * fraction - 3.dp)
-                    .align(Alignment.CenterStart)
-                    .size(6.dp)
-                    .background(
-                        if (abs(err) <= PERFECT_WINDOW_MS) Color(0xFF1C9A6A) else Color(0xFFC98F00),
-                        shape = CircleShape,
-                    ),
-            )
+            val x = ((clamped + 120.0) / 240.0).toFloat() * size.width
+            val newest = i == errors.lastIndex
+            val r = h * (if (newest) 0.3f else 0.2f)
+            val color = if (abs(err) <= PERFECT_WINDOW_MS) Color(0xFF3FE0A0) else Color(0xFFFFB320)
+            drawCircle(CAL_INK, radius = r + 1.5f, center = Offset(x, h / 2f))
+            drawCircle(color.copy(alpha = 0.4f + 0.6f * (i + 1f) / errors.size), radius = r, center = Offset(x, h / 2f))
         }
     }
     Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.width(width)) {
@@ -242,21 +333,42 @@ private fun TimingStrip(errors: List<Double>) {
     }
 }
 
-/** A dark gradient field with a soft glow behind the dial and faint sonar rings bleeding into the side margins. */
-private fun DrawScope.drawCalibrateBackground(w: Float, h: Float, glowCenter: Offset, glowRadius: Float) {
+/**
+ * A dark gradient field with a soft glow behind the dial, a faint dot grid, and a sonar ring that
+ * ripples out from the dial on every click ([flash]), bleeding into the side margins.
+ */
+private fun DrawScope.drawCalibrateBackground(w: Float, h: Float, glowCenter: Offset, glowRadius: Float, flash: Float) {
     drawRect(
-        brush = Brush.verticalGradient(colors = listOf(Color(0xFF14312F), Color(0xFF081514)), startY = 0f, endY = h),
+        brush = Brush.verticalGradient(colors = listOf(Color(0xFF17403C), Color(0xFF081514)), startY = 0f, endY = h),
         size = Size(w, h),
     )
+    val step = glowRadius * 0.16f
+    var y = (h / 2f) % step
+    while (y < h) {
+        var x = (w / 2f) % step
+        while (x < w) {
+            drawCircle(Color.White.copy(alpha = 0.05f), radius = step * 0.06f, center = Offset(x, y))
+            x += step
+        }
+        y += step
+    }
     drawCircle(
         brush = Brush.radialGradient(
-            colors = listOf(Color(0xFF2FBF9E).copy(alpha = 0.16f), Color.Transparent),
+            colors = listOf(Color(0xFF2FBF9E).copy(alpha = 0.2f + 0.1f * flash), Color.Transparent),
             center = glowCenter,
             radius = glowRadius,
         ),
         radius = glowRadius,
         center = glowCenter,
     )
+    if (flash > 0f) {
+        drawCircle(
+            color = Color(0xFF7FF0CF).copy(alpha = 0.3f * flash),
+            radius = glowRadius * (0.75f + 0.45f * (1f - flash)),
+            center = glowCenter,
+            style = Stroke(width = 3f + 5f * flash),
+        )
+    }
     for (i in 1..3) {
         drawCircle(
             color = Color.White.copy(alpha = 0.035f),
@@ -270,4 +382,25 @@ private fun DrawScope.drawCalibrateBackground(w: Float, h: Float, glowCenter: Of
 internal fun formatMs(v: Double): String {
     val sign = if (v >= 0) "+" else "−"
     return "$sign${round(abs(v)).toInt()}ms"
+}
+
+/** The main menu's Calibrate emblem: a little dial whose hand sweeps round once per beat of [beat]. */
+internal fun DrawScope.drawCalibrateEmblem(beat: Double) {
+    val c = Offset(size.width / 2f, size.height / 2f)
+    val r = size.minDimension * 0.42f
+    drawCircle(CAL_INK, radius = r, center = c)
+    drawCircle(Color(0xFF184A48), radius = r * 0.86f, center = c)
+    val a = ((-90.0 + (beat - floor(beat)) * 360.0) * PI / 180.0).toFloat()
+    val tip = c + Offset(cos(a), sin(a)) * (r * 0.7f)
+    drawLine(CAL_INK, c, tip, strokeWidth = r * 0.2f, cap = StrokeCap.Round)
+    drawLine(Color(0xFFFFB320), c, tip, strokeWidth = r * 0.1f, cap = StrokeCap.Round)
+    val flash = (1.0 - (beat - floor(beat)) * 4.0).coerceAtLeast(0.0).toFloat()
+    val g = r * (0.2f + 0.08f * flash)
+    val top = c - Offset(0f, r * 0.7f)
+    val gem = Path().apply {
+        moveTo(top.x, top.y - g); lineTo(top.x + g, top.y); lineTo(top.x, top.y + g); lineTo(top.x - g, top.y); close()
+    }
+    drawPath(gem, lerp(Color(0xFFBDF7E6), Color.White, flash))
+    drawPath(gem, CAL_INK, style = Stroke(width = r * 0.06f, join = StrokeJoin.Round))
+    drawCircle(Color(0xFFFFD36A), radius = r * 0.12f, center = c)
 }

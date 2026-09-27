@@ -12,6 +12,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -56,6 +61,7 @@ fun MainMenu(calibration: Calibration, chart: ChartSetting, onSelect: (Stage) ->
         val entrySubtitleSize = (minDim * 0.028f).sp
         val toggleTextSize = (minDim * 0.04f).sp
         val entryPadding = (minDim * 0.014f).dp
+        val emblemSize = (minDim * 0.13f).dp
         val menuWidth = (minOf(maxWidth, maxHeight) * 1.35f).coerceAtMost(maxWidth * 0.92f)
 
         Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0A1614)))
@@ -79,6 +85,15 @@ fun MainMenu(calibration: Calibration, chart: ChartSetting, onSelect: (Stage) ->
             label = "particle-drift",
         )
 
+        // A free-running beat count at the shared tempo, for the title's bounce and the emblems.
+        val beatCount by infinite.animateFloat(
+            initialValue = 0f,
+            targetValue = 64f,
+            animationSpec = infiniteRepeatable(tween((SECONDS_PER_BEAT * 64 * 1000).toInt(), easing = LinearEasing)),
+            label = "menu-beat",
+        )
+        val beat = beatCount.toDouble()
+
         Canvas(modifier = Modifier.fillMaxSize()) { drawMenuBackdrop(beatPulse, drift) }
 
         Column(
@@ -92,7 +107,7 @@ fun MainMenu(calibration: Calibration, chart: ChartSetting, onSelect: (Stage) ->
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(entryPadding),
         ) {
-            HudText("Wristbeat", loud = true, fontSize = titleSize)
+            BouncingTitle("Wristbeat", titleSize, beat)
             Spacer(Modifier.height(entryPadding))
             for (stage in Stage.entries) {
                 MenuEntry(
@@ -103,6 +118,15 @@ fun MainMenu(calibration: Calibration, chart: ChartSetting, onSelect: (Stage) ->
                     labelSize = entryLabelSize,
                     subtitleSize = entrySubtitleSize,
                     padding = entryPadding,
+                    emblemSize = emblemSize,
+                    emblem = {
+                        when (stage) {
+                            Stage.CALIBRATE -> drawCalibrateEmblem(beat)
+                            Stage.SNAP_CRABS -> drawSnapCrabsEmblem(beat)
+                            Stage.MANGO_CHOP -> drawMangoChopEmblem(beat)
+                            Stage.BONGO_BLITZ -> drawBongoBlitzEmblem(beat)
+                        }
+                    },
                     onClick = { onSelect(stage) },
                 )
             }
@@ -128,15 +152,44 @@ private fun MenuEntry(
     labelSize: TextUnit,
     subtitleSize: TextUnit,
     padding: Dp,
+    emblemSize: Dp,
+    emblem: DrawScope.() -> Unit,
     onClick: () -> Unit,
 ) {
     GameButton(modifier = Modifier.fillMaxWidth(), accent = accent, enabled = enabled, onClick = onClick) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(vertical = padding),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            HudText(label, loud = true, color = Color(0xFF1A1206), fontSize = labelSize)
-            HudText(subtitle, color = Color(0xFF1A1206).copy(alpha = 0.75f), fontSize = subtitleSize)
+        // The stage's emblem on the left, balanced by an equal gap on the right so the text stays centred.
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Canvas(modifier = Modifier.size(emblemSize), onDraw = emblem)
+            Column(
+                modifier = Modifier.weight(1f).padding(vertical = padding),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                HudText(label, loud = true, color = Color(0xFF1A1206), fontSize = labelSize)
+                HudText(subtitle, color = Color(0xFF1A1206).copy(alpha = 0.75f), fontSize = subtitleSize)
+            }
+            Spacer(Modifier.width(emblemSize))
+        }
+    }
+}
+
+/**
+ * The game's title as chunky outlined letters, each in a stage's accent color, hopping one after
+ * another in a wave that travels across the word once per beat.
+ */
+@Composable
+private fun BouncingTitle(text: String, fontSize: TextUnit, beat: Double) {
+    val colors = Stage.entries.map { lerp(it.accent, Color.White, 0.25f) }
+    val hop = with(LocalDensity.current) { fontSize.toPx() } * 0.12f
+    Row {
+        for ((i, letter) in text.withIndex()) {
+            val phase = ((beat - i * 0.09) % 1.0 + 1.0) % 1.0
+            val lift = if (phase < 0.35) sin(phase / 0.35 * PI).toFloat() else 0f
+            OutlinedHudText(
+                letter.toString(),
+                fontSize = fontSize,
+                color = colors[i % colors.size],
+                modifier = Modifier.graphicsLayer { translationY = -lift * hop },
+            )
         }
     }
 }

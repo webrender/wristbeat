@@ -36,9 +36,16 @@ enum class SoundId {
     PLAYER_BONGO_LO,
     CHEER,
     BOO,
+    MARIMBA,
+    PAN_FLUTE,
+    PAD,
+    CLAVE,
 }
 
-/** [param] carries a sound-specific extra value (a MIDI note for BASS_*, MEL, STEEL_PAN, KEYS and TOM); other sounds leave it 0. */
+/**
+ * [param] carries a sound-specific extra value (a MIDI note for BASS_*, MEL, STEEL_PAN, KEYS, TOM,
+ * MARIMBA, PAN_FLUTE and PAD); other sounds leave it 0.
+ */
 data class ChartEvent(val beat: Double, val sound: SoundId, val param: Double = 0.0)
 
 /**
@@ -354,26 +361,68 @@ object Charts {
         return events.sortedBy { it.beat }
     }
 
-    /** An 8-beat marimba riff, one per call-and-response pair, kept simple so it never competes with the calls. */
-    private val BONGO_RIFF: List<Pair<Double, Double>> = listOf(
-        0.0 to 62.0, 1.0 to 65.0, 1.5 to 67.0, 2.5 to 65.0, 3.0 to 62.0,
-        4.0 to 60.0, 4.5 to 62.0, 5.5 to 65.0, 6.0 to 67.0, 7.0 to 70.0,
-    )
+    /** One bar of a Bongo Blitz progression: the bass root and a pad/marimba voicing. */
+    private class BongoChord(val root: Double, val voicing: List<Double>)
 
-    /** Low roots under the groove, cycling every four pairs (32 beats, one section). */
-    private val BONGO_ROOTS = listOf(38.0, 41.0, 43.0, 38.0)
+    private val B_DM = BongoChord(38.0, listOf(62.0, 65.0, 69.0))
+    private val B_BB = BongoChord(34.0, listOf(62.0, 65.0, 70.0))
+    private val B_C = BongoChord(36.0, listOf(60.0, 64.0, 67.0))
+    private val B_GM = BongoChord(43.0, listOf(62.0, 67.0, 70.0))
+    private val B_A = BongoChord(33.0, listOf(61.0, 64.0, 69.0))
+    private val B_EB = BongoChord(39.0, listOf(63.0, 67.0, 70.0))
+    private val B_F = BongoChord(41.0, listOf(60.0, 65.0, 69.0))
+
+    /** One chord per bar, eight bars (four call-and-response pairs) per section. */
+    private val BONGO_VERSE_CHORDS = listOf(B_DM, B_DM, B_BB, B_C, B_DM, B_DM, B_GM, B_A)
+    private val BONGO_CHORUS_CHORDS = listOf(B_BB, B_C, B_DM, B_DM, B_BB, B_C, B_GM, B_A)
+    private val BONGO_BRIDGE_CHORDS = listOf(B_GM, B_GM, B_EB, B_EB, B_F, B_F, B_A, B_A)
 
     /**
-     * Bongo Blitz's own backing: a lean jungle percussion groove (kick, rim, shaker, a low bass
-     * thump) that stays out of the way of the monkey's calls, laid out by [BongoBlitzSong]:
-     * - **Intro** — the riff over a droning root and a light shaker, then a bar of sticks over a
+     * The chorus's pan flute hook over [BONGO_CHORUS_CHORDS]: (beat offset in the section, MIDI note).
+     * Each call bar gets a single note on its downbeat — where every call starts anyway, so it never
+     * blurs the rhythm the player has to memorize — and the tune answers in the response bar.
+     */
+    private val BONGO_CHORUS_HOOK: List<Pair<Double, Double>> = listOf(
+        0.0 to 74.0, 4.0 to 76.0, 4.5 to 77.0, 5.0 to 79.0, 6.0 to 77.0, 6.5 to 76.0, 7.0 to 72.0,
+        8.0 to 74.0, 12.0 to 77.0, 13.0 to 76.0, 13.5 to 74.0, 14.0 to 72.0, 14.5 to 74.0, 15.5 to 69.0,
+        16.0 to 74.0, 20.0 to 76.0, 20.5 to 77.0, 21.0 to 79.0, 22.0 to 81.0, 22.5 to 79.0, 23.0 to 77.0,
+        24.0 to 79.0, 28.0 to 76.0, 28.5 to 73.0, 29.0 to 76.0, 30.0 to 81.0, 31.0 to 73.0,
+    )
+
+    /** The bridge's climbing line over [BONGO_BRIDGE_CHORDS], same call-bar/response-bar layout as the hook. */
+    private val BONGO_BRIDGE_LINE: List<Pair<Double, Double>> = listOf(
+        0.0 to 79.0, 4.0 to 74.0, 4.5 to 77.0, 5.0 to 79.0, 5.5 to 77.0, 6.0 to 74.0, 7.0 to 70.0,
+        8.0 to 79.0, 12.0 to 75.0, 12.5 to 79.0, 13.0 to 82.0, 14.0 to 79.0, 14.5 to 75.0, 15.0 to 74.0,
+        16.0 to 81.0, 20.0 to 77.0, 20.5 to 81.0, 21.0 to 84.0, 22.0 to 81.0, 22.5 to 77.0, 23.0 to 76.0,
+        24.0 to 81.0, 28.0 to 73.0, 28.5 to 76.0, 29.0 to 79.0, 30.0 to 81.0, 30.5 to 79.0, 31.0 to 76.0, 31.5 to 73.0,
+    )
+
+    /** A 3-3-2 marimba figure through one bar of [chord]: root, fifth, octave, fifth, third, root. */
+    private fun marimbaBar(beat: Double, chord: BongoChord): List<ChartEvent> {
+        // The chord's root in the marimba's 60–71 octave, with a minor or major third from the voicing.
+        val root = 60.0 + (chord.root.toInt() % 12)
+        val pitchClasses = chord.voicing.map { it.toInt() % 12 }
+        val third = if ((root.toInt() + 3) % 12 in pitchClasses) root + 3 else root + 4
+        val fifth = root + 7
+        return listOf(0.0 to root, 1.0 to fifth, 1.5 to root + 12, 2.5 to fifth, 3.0 to third, 3.5 to root)
+            .map { (o, note) -> ChartEvent(beat + o, SoundId.MARIMBA, note) }
+    }
+
+    /**
+     * Bongo Blitz's own song, a D minor jungle-exotica tune at [BONGO_BLITZ_BPM]: marimba, a breathy
+     * pan flute, a soft pad, a walking bass and a kit with shaker and clave, laid out by
+     * [BongoBlitzSong]. Its arrangement follows the call-and-response itself: in each **call bar**
+     * the band holds back to a steady on-the-beat pulse, a pad chord and one downbeat note, so the
+     * monkey's rhythm is the only syncopation to hear; in each **response bar** the band answers
+     * along with the player — the melody, bass runs and fills all live there.
+     * - **Intro** — the chorus hook on marimba over the pad, then a bar of sticks over a
      *   four-on-the-floor kick to count the fast tempo in.
-     * - **Verse** — just kick, rim and shaker under the tap-only calls, so the fast tempo settles in
-     *   before anything else is added.
-     * - **Chorus** — an off-beat hat and the riff return once the low drum joins the calls.
-     * - **Bridge** — a 32nd-note rim-roll pickup into every response bar, building tension under the
-     *   densest patterns.
-     * - **Outro** — a final low hit with a crash and a rising riff flourish.
+     * - **Verse** (tap-only calls) — kit, bass and pad, with a 3-3-2 marimba figure answering in each
+     *   response bar; a tom fill leads into the chorus.
+     * - **Chorus** (the low drum joins) — a crash, offbeat hats and the pan flute hook.
+     * - **Bridge** (the densest calls) — a new Gm–Eb–F–A progression over four-on-the-floor, the
+     *   flute and marimba doubling a climbing line, clave and a rim-roll pickup into every response.
+     * - **Outro** — a final D minor hit with a crash, pad and a flute run up to the top D.
      */
     fun bongoBlitzBacking(): List<ChartEvent> {
         val events = mutableListOf<ChartEvent>()
@@ -382,48 +431,98 @@ object Charts {
         val bridge = BongoBlitzSong.BRIDGE
         val outro = BongoBlitzSong.OUTRO
 
-        // Intro: two bars of the riff over a droning root and a light shaker, then a bar of sticks
-        // over a four-on-the-floor kick to count the fast tempo in.
-        for (i in 0 until 16) if (i % 2 == 0) events += ChartEvent(i * 0.5, SoundId.SHAKER)
-        for ((offset, note) in BONGO_RIFF) events += ChartEvent(offset, SoundId.KEYS, note)
-        events += ChartEvent(0.0, SoundId.BASS_LONG, BONGO_ROOTS[0])
-        events += ChartEvent(4.0, SoundId.BASS_LONG, BONGO_ROOTS[1])
+        // Intro: two bars of the hook's opening on marimba over pad, bass and shaker.
+        for ((bar, chord) in listOf(B_BB, B_C).withIndex()) {
+            val b = bar * 4.0
+            for (note in chord.voicing) events += ChartEvent(b, SoundId.PAD, note)
+            events += ChartEvent(b, SoundId.BASS_LONG, chord.root)
+            events += ChartEvent(b + 2, SoundId.BASS_MED, chord.root + 7)
+            for (i in 0 until 8) events += ChartEvent(b + i * 0.5, SoundId.SHAKER)
+        }
+        for ((offset, note) in BONGO_CHORUS_HOOK) if (offset < 8.0) events += ChartEvent(offset, SoundId.MARIMBA, note - 12)
+        // Count-in bar: sticks over a four-on-the-floor kick on the A chord, pulling into the verse.
         for (i in 8 until 12) {
             events += ChartEvent(i.toDouble(), SoundId.STICK)
             events += ChartEvent(i.toDouble(), SoundId.KICK)
         }
+        for (note in B_A.voicing) events += ChartEvent(8.0, SoundId.PAD, note)
+        events += ChartEvent(8.0, SoundId.BASS_LONG, B_A.root)
+        events += ChartEvent(10.0, SoundId.BASS_LONG, B_A.root + 12)
 
-        // Verse, chorus and bridge: a two-bar (8-beat) groove under each call-and-response pair.
+        // Verse, chorus and bridge: one bar per chord, alternating call and response bars.
         var b = verse
-        var pairIndex = 0
         while (b < outro) {
             val inBridge = b >= bridge
             val inChorus = b >= chorus && !inBridge
-            val root = BONGO_ROOTS[pairIndex % BONGO_ROOTS.size]
-            events += ChartEvent(b, SoundId.KICK)
-            events += ChartEvent(b + 4, SoundId.KICK)
-            events += ChartEvent(b + 2, SoundId.RIM)
-            events += ChartEvent(b + 6, SoundId.RIM)
-            for (i in 0 until 16) if (i % 2 == 1) events += ChartEvent(b + i * 0.5, SoundId.SHAKER)
-            if (inChorus || inBridge) {
-                for (i in 0 until 16) if (i % 4 == 3) events += ChartEvent(b + i * 0.5, SoundId.HAT)
-                for ((offset, note) in BONGO_RIFF) events += ChartEvent(b + offset, SoundId.KEYS, note)
+            val sectionStart = when {
+                inBridge -> bridge
+                inChorus -> chorus
+                else -> verse
             }
-            events += ChartEvent(b, SoundId.BASS_MED, root)
-            events += ChartEvent(b + 4, SoundId.BASS_MED, root)
-            if (inBridge) {
-                // A rim-roll pickup into the response bar, raising the tension under the hardest calls.
-                for (i in 0 until 4) events += ChartEvent(b + 3.5 + i * 0.125, SoundId.RIM)
+            val barInSection = ((b - sectionStart) / 4).toInt()
+            val chords = when {
+                inBridge -> BONGO_BRIDGE_CHORDS
+                inChorus -> BONGO_CHORUS_CHORDS
+                else -> BONGO_VERSE_CHORDS
             }
-            b += 8
-            pairIndex++
-        }
-        events += ChartEvent(chorus, SoundId.CRASH)
-        events += ChartEvent(bridge, SoundId.CRASH)
+            val chord = chords[barInSection % chords.size]
+            val responseBar = barInSection % 2 == 1
+            val lastBarOfSection = b + 4 == chorus || b + 4 == bridge
 
-        // Outro: the final low hit with a crash, and a rising riff flourish.
-        events += finalHit(outro, BONGO_ROOTS[0])
-        for ((i, note) in listOf(62.0, 67.0, 70.0, 74.0).withIndex()) events += ChartEvent(outro + i * 0.25, SoundId.KEYS, note)
+            // Kit: a steady pulse — kick on 1 and 3 (every beat in the bridge), rim backbeat, 8th
+            // shaker — with a pushed kick on the "and" of 4 in response bars once the chorus starts.
+            val kicks = if (inBridge) listOf(0.0, 1.0, 2.0, 3.0) else listOf(0.0, 2.0)
+            for (o in kicks) events += ChartEvent(b + o, SoundId.KICK)
+            if (responseBar && !inBridge && inChorus) events += ChartEvent(b + 3.5, SoundId.KICK)
+            events += ChartEvent(b + 1, SoundId.RIM)
+            if (!lastBarOfSection) events += ChartEvent(b + 3, SoundId.RIM)
+            for (i in 0 until 8) events += ChartEvent(b + i * 0.5, SoundId.SHAKER)
+            if (inChorus || inBridge) for (o in listOf(0.5, 1.5, 2.5, 3.5)) events += ChartEvent(b + o, SoundId.HAT)
+
+            // Pad on every bar; the bass holds in call bars and walks in response bars.
+            for (note in chord.voicing) events += ChartEvent(b, SoundId.PAD, note)
+            if (responseBar) {
+                events += ChartEvent(b, SoundId.BASS_MED, chord.root)
+                events += ChartEvent(b + 1.5, SoundId.BASS_SHORT, chord.root + 12)
+                events += ChartEvent(b + 2, SoundId.BASS_SHORT, chord.root + 7)
+                events += ChartEvent(b + 3, SoundId.BASS_SHORT, chord.root + 10)
+                events += ChartEvent(b + 3.5, SoundId.BASS_SHORT, chord.root + 12)
+            } else {
+                events += ChartEvent(b, SoundId.BASS_LONG, chord.root)
+                events += ChartEvent(b + 2, SoundId.BASS_LONG, chord.root)
+            }
+
+            if (responseBar) {
+                when {
+                    inBridge -> {
+                        for (o in listOf(0.0, 1.5, 3.0)) events += ChartEvent(b + o, SoundId.CLAVE)
+                    }
+                    !inChorus && !lastBarOfSection -> events += marimbaBar(b, chord)
+                    else -> Unit
+                }
+            } else if (inBridge) {
+                // A 32nd-note rim-roll pickup into the response bar, raising the tension under the
+                // hardest calls — after the call's last possible note at 3.5, so it never blurs it.
+                for (i in 1 until 4) events += ChartEvent(b + 3.5 + i * 0.125, SoundId.RIM)
+            }
+            if (lastBarOfSection) events += tomFill(b + 3)
+            b += 4
+        }
+        for (crash in listOf(chorus, bridge)) events += ChartEvent(crash, SoundId.CRASH)
+        for ((offset, note) in BONGO_CHORUS_HOOK) events += ChartEvent(chorus + offset, SoundId.PAN_FLUTE, note)
+        for ((offset, note) in BONGO_BRIDGE_LINE) {
+            events += ChartEvent(bridge + offset, SoundId.PAN_FLUTE, note)
+            events += ChartEvent(bridge + offset, SoundId.MARIMBA, note - 12)
+        }
+
+        // Outro: the final D minor hit, with the pad ringing under a flute run up to the top D.
+        events += finalHit(outro, B_DM.root)
+        for (note in B_DM.voicing) events += ChartEvent(outro, SoundId.PAD, note)
+        for ((i, note) in listOf(69.0, 72.0, 74.0, 77.0, 81.0, 86.0).withIndex()) {
+            events += ChartEvent(outro + i * 0.25, SoundId.PAN_FLUTE, note)
+        }
+        events += ChartEvent(outro, SoundId.MARIMBA, 62.0)
+        events += ChartEvent(outro, SoundId.MARIMBA, 74.0)
         return events.sortedBy { it.beat }
     }
 }

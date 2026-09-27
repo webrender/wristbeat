@@ -111,7 +111,7 @@ class BongoBlitzStageTest {
     @Test fun songHasAnIntroBeforeTheFirstCallAndAnOutroAfterTheLastTarget() {
         val stage = BongoBlitzStage()
         assertEquals(BongoBlitzSong.VERSE, stage.leadCues.first().beat)
-        assertTrue(stage.chart.any { it.beat < BongoBlitzSong.VERSE - 4 && it.sound == SoundId.KEYS })
+        assertTrue(stage.chart.any { it.beat < BongoBlitzSong.VERSE - 4 && it.sound == SoundId.MARIMBA })
         assertTrue(stage.targets.last().beat < BongoBlitzSong.OUTRO)
         assertTrue(stage.chart.any { it.beat == BongoBlitzSong.OUTRO && it.sound == SoundId.CRASH })
         assertTrue(stage.chart.all { it.beat < stage.end })

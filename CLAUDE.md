@@ -26,8 +26,11 @@ build and launch the shared `App()`), but their platform actuals are placeholder
   - `Judgment.kt` — `Grade`, `ScoreTally`, `Rank` and the PERFECT/OK/miss math.
   - `Chart.kt` — `SoundId`, `ChartEvent`, and `Charts` (procedural chart generators:
     `snapCrabsBacking`, the prototype's ukulele band; `mangoChopBacking`, Mango Chop's own soca
-    song in A minor with keyboard stabs, shaker and a steel pan tune; and `bongoBlitzBacking`, a lean
-    jungle percussion groove that stays out of the way of Bongo Blitz's calls). Each song has a real
+    song in A minor with keyboard stabs, shaker and a steel pan tune; and `bongoBlitzBacking`, a D minor
+    jungle-exotica tune — marimba, pan flute, pad, walking bass, kit with shaker and clave — arranged
+    around the call-and-response: each call bar holds back to a steady pulse, a pad chord and one
+    downbeat note so the monkey's rhythm is the only syncopation, and the melody, bass runs and
+    fills all answer in the response bar). Each song has a real
     form, laid out in beats by `SnapCrabsSong`/`MangoChopSong`/`BongoBlitzSong`: a musical intro whose
     last bar is the stick count-in, verse/chorus sections (plus a bridge with its own progression in
     Mango Chop and Bongo Blitz) marked by crashes and tom/rim fills, and an outro that lands on a
@@ -100,8 +103,8 @@ into the same timebase before judging, per HANDOFF's timing-accuracy requirement
   is a stray: it consumes nothing, and the fruit bounces off as a miss if it isn't corrected in time.
   Its note highway shows a single row of each landing (the beat to act on; pineapples as slanted
   swipe arrows), and hides with the same chart toggle.
-- **Bongo Blitz** — the hardest stage, at 172 BPM (`Charts.bongoBlitzBacking`, its own lean jungle
-  percussion groove). A monkey claps a call on its high (tap) or low (swipe) drum, and the player
+- **Bongo Blitz** — the hardest stage, at 172 BPM (`Charts.bongoBlitzBacking`, its own marimba and
+  pan flute tune; the `MARIMBA`, `PAN_FLUTE`, `PAD` and `CLAVE` voices exist for it). A monkey claps a call on its high (tap) or low (swipe) drum, and the player
   repeats it exactly — both rhythm and which drum — one bar later: Snap Crabs' call-and-response
   memory task, layered with Mango Chop's tap/swipe discrimination, at a faster tempo and with longer,
   more syncopated eighth-note tap runs than either other stage. The verse is tap-only and the chorus
@@ -118,7 +121,10 @@ into the same timebase before judging, per HANDOFF's timing-accuracy requirement
   `drawSunburst` ring — so nothing of the game shows through. A big rank/headline and an even bigger
   hero number (the score, as a percentage) bounce in (`bounce`, a spring) and count up from zero
   (`count`, a tween driving `heroValue * count.value`), with the Perfect/OK/Miss stats counting up
-  alongside them; "Try again" and "Menu" fade in last. The transition plays a sound once, picked by
+  alongside them in a panel (`gradeStats`, color-coded gold/green/coral); "Try again" and "Menu"
+  fade in last. The headline slams in like a rubber stamp (`stamp`), and headline and hero are
+  set in `Hud.kt`'s `OutlinedHudText`. `passed` sets the mood: confetti on a pass, a gloomy
+  drizzle and desaturated backdrop on a fail, neither for Calibrate (null). The transition plays a sound once, picked by
   `tally.rank`: a cheer (`SoundId.CHEER`) for a pass (OK or Superb), a sad-trombone boo
   (`SoundId.BOO`) for `Rank.TRY_AGAIN`. Calibrate reuses the same `StageResults` shell for its
   offset readout (counting up to the measured `ms`), but plays no sound — it isn't scored pass/fail.
@@ -157,6 +163,14 @@ into the same timebase before judging, per HANDOFF's timing-accuracy requirement
     interactive elements stay confined to the centered square. This directly implements HANDOFF's
     "keep the stage centered at the largest size that fits, extend background art in the margins"
     scaling rule — don't reintroduce a small watch-shaped clipped circle on desktop.
+  - Stage art is inked cartoon style, set by Bongo Blitz and carried through every stage: shapes
+    get a dark outline in the scene's own ink color (`OUTLINE`, `BEACH_INK`, `MARKET_INK`,
+    `CAL_INK`), gradient shading with a glossy highlight rather than flat fills, soft radial drop
+    shadows, and layered, beat-driven scenery (clouds, gulls, fireflies, surf, swaying leaves all
+    move on `beatPosition`, never a separate clock). Characters react to their cues (mouths
+    open, sparks/bursts on hits). The note highway (`NoteHighway.kt`) follows suit: an inked
+    track, scrolling beat ticks, a hit ring, and outlined glossy note gems. The main menu shows
+    each stage's own art as an animated emblem (`drawSnapCrabsEmblem` etc.) beside its entry.
   - Text goes through `Hud.kt`'s `HudText`/`HudChip`, not plain Material `Text`, so it reads as
     game HUD copy: shadowed, letter-spaced, all-caps, and set in **Sniglet** (OFL-licensed, see
     `THIRD_PARTY_LICENSES/sniglet-OFL.txt`), a bubbly rounded display face loaded via Compose
@@ -216,9 +230,10 @@ for i in $(seq 1 20); do curl -s -o /dev/null -w "%{http_code}" http://localhost
 
 `devserver.log` is gitignored — it's scratch output from the command above, not a tracked artifact.
 
-There's no browser automation available in this environment — visual verification of Compose
-Canvas output has come entirely from Jeremy's own screenshots and feedback, not from an independent
-screenshot check. Say so explicitly rather than claiming a visual change looks right sight unseen.
+In the Claude desktop app, the built-in browser pane can open the dev server at
+`http://localhost:8080` and take screenshots, so visual changes can be checked directly (it can't
+hear the audio, though — sound changes still need Jeremy's ears). Without a browser, say so
+explicitly rather than claiming a visual change looks right sight unseen.
 
 ## Not started yet
 

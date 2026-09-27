@@ -116,6 +116,20 @@ actual class AudioEngine actual constructor() {
                     osc(Wave.SAWTOOTH, freq, tt, 0.02, 0.22, 0.24, endFreq = freq * 0.94)
                 }
             }
+            // Same voicings as AudioEngine.wasmJs.kt's Bongo Blitz band.
+            SoundId.MARIMBA -> {
+                val freq = mtof(param)
+                osc(Wave.SINE, freq, t, 0.002, 0.13, 0.32)
+                osc(Wave.SINE, freq * 4.0, t, 0.001, 0.035, 0.04)
+            }
+            SoundId.PAN_FLUTE -> {
+                val freq = mtof(param)
+                osc(Wave.SINE, freq, t, 0.025, 0.1, 0.34)
+                osc(Wave.TRIANGLE, freq * 2.0, t, 0.02, 0.012, 0.18)
+                noise(t, 0.16, 0.12, FilterType.BANDPASS, freq, 14.0)
+            }
+            SoundId.PAD -> osc(Wave.TRIANGLE, mtof(param), t, 0.09, 0.028, 1.1)
+            SoundId.CLAVE -> osc(Wave.SINE, 2500.0, t, 0.001, 0.12, 0.035)
         }
     }
 }

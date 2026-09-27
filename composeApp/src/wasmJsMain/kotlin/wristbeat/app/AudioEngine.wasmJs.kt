@@ -131,6 +131,25 @@ actual class AudioEngine actual constructor() {
                     jsOscRamp(ctx, "sawtooth", freq, freq * 0.94, tt, 0.02, 0.22, 0.24)
                 }
             }
+            // Bongo Blitz's marimba: a woody fundamental plus the bar's bright overtone two octaves
+            // up, which dies away almost at once — the "tock" at the start of each note.
+            SoundId.MARIMBA -> {
+                val freq = mtof(param)
+                jsOsc(ctx, "sine", freq, atSeconds, 0.002, 0.13, 0.32)
+                jsOsc(ctx, "sine", freq * 4.0, atSeconds, 0.001, 0.035, 0.04)
+            }
+            // A breathy pan flute: a soft sine with a little attack, plus noise band-passed tightly
+            // at the note's pitch for the breath.
+            SoundId.PAN_FLUTE -> {
+                val freq = mtof(param)
+                jsOsc(ctx, "sine", freq, atSeconds, 0.025, 0.1, 0.34)
+                jsOsc(ctx, "triangle", freq * 2.0, atSeconds, 0.02, 0.012, 0.18)
+                jsNoise(ctx, noise, atSeconds, 0.16, 0.12, "bandpass", freq, 14.0)
+            }
+            // A soft swelling pad under Bongo Blitz, one triangle per chord note.
+            SoundId.PAD -> jsOsc(ctx, "triangle", mtof(param), atSeconds, 0.09, 0.028, 1.1)
+            // A high wooden click, well above the bongos so it never reads as a call.
+            SoundId.CLAVE -> jsOsc(ctx, "sine", 2500.0, atSeconds, 0.001, 0.12, 0.035)
         }
     }
 }

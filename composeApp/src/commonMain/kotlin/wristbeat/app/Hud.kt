@@ -10,7 +10,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
@@ -125,8 +129,53 @@ fun GameButton(
         )
     }
     val watch = LocalHudLayout.current.watch
-    Box(modifier = panelModifier.padding(horizontal = if (watch) 10.dp else 14.dp, vertical = if (watch) 5.dp else 7.dp)) {
+    Box(
+        modifier = panelModifier.padding(horizontal = if (watch) 10.dp else 14.dp, vertical = if (watch) 5.dp else 7.dp),
+        contentAlignment = Alignment.Center,
+    ) {
         content()
+    }
+}
+
+/** The dark ink that [OutlinedHudText] and the stage art outline their shapes in. */
+internal val HUD_INK = Color(0xFF140A1E)
+
+/**
+ * Chunky title text: the ExtraBold cut with a thick [HUD_INK] outline and a drop shadow under a
+ * solid [color] fill, the way game logos and rank stamps are lettered — for the big, few-word
+ * lines (the menu title, results headline and score), not running HUD copy.
+ */
+@Composable
+fun OutlinedHudText(
+    text: String,
+    fontSize: TextUnit,
+    modifier: Modifier = Modifier,
+    color: Color = Color.White,
+    outline: Color = HUD_INK,
+) {
+    val strokePx = with(LocalDensity.current) { fontSize.toPx() } * 0.16f
+    val family = hudFontFamily(loud = true)
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        Text(
+            text = text.uppercase(),
+            color = outline,
+            fontFamily = family,
+            fontSize = fontSize,
+            letterSpacing = 0.3.sp,
+            textAlign = TextAlign.Center,
+            style = TextStyle(
+                drawStyle = Stroke(width = strokePx, join = StrokeJoin.Round),
+                shadow = Shadow(color = Color.Black.copy(alpha = 0.55f), offset = Offset(0f, strokePx * 0.9f), blurRadius = strokePx),
+            ),
+        )
+        Text(
+            text = text.uppercase(),
+            color = color,
+            fontFamily = family,
+            fontSize = fontSize,
+            letterSpacing = 0.3.sp,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 
