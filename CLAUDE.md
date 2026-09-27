@@ -53,7 +53,7 @@ into the same timebase before judging, per HANDOFF's timing-accuracy requirement
 
 ## Current status (playable today, on web)
 
-- **Calibrate** — full 36-beat click-track calibration with a progress ring, duration blurb,
+- **Calibrate** — 20-beat click-track calibration (4-beat count-in, then 16 taps) with a progress ring, duration blurb,
   count-in distinction, live tap counter, and a timing strip. Runs first by default.
 - **Snap Crabs** — fully playable: a lead crab snaps a call-and-response pattern, a note highway
   shows upcoming calls/targets sliding toward a hit line, backing band (kick/rim/hat/bass/uke +

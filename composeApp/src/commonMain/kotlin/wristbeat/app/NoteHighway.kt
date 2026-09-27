@@ -10,13 +10,18 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 /** [DOT] is a tap; [SWIPE] is a slanted arrow, so a swipe target can't be mistaken for a tap. */
 internal enum class NoteShape { DOT, SWIPE }
 
-/** One marker on a [drawNoteHighway] row, arriving at the hit line on [beat]. */
+/**
+ * One marker on a [drawNoteHighway] row, arriving at the hit line on [beat]. [radius] is in the
+ * stages' 400×400 logical units; the highway scales it to the on-screen stage size.
+ */
 internal data class HighwayNote(
     val beat: Double,
     val color: Color,
     val radius: Float,
     val shape: NoteShape = NoteShape.DOT,
 )
+
+private const val NOTE_SIZE_BOOST = 1.6f
 
 /**
  * A note highway: cues (top row) and player targets (bottom row) slide in from the right and
@@ -34,6 +39,10 @@ internal fun DrawScope.drawNoteHighway(
     laneRightX: Float,
 ) {
     val rowGap = size.height * 0.045f
+    // The lanes span 72% of the 400-unit logical stage (0.20–0.92), so this maps note radii from
+    // logical units to pixels; [NOTE_SIZE_BOOST] enlarges them past the prototype's sizes, which
+    // read as specks on a real screen.
+    val noteScale = (laneRightX - laneLeftX) / (400f * 0.72f) * NOTE_SIZE_BOOST
     val cueRowY = laneY - rowGap
     val targetRowY = laneY + rowGap
 
@@ -62,8 +71,8 @@ internal fun DrawScope.drawNoteHighway(
     // target arrives, so it doubles as both a metronome and the "act now" cue.
     drawLine(
         Color(0xFFFFE29A).copy(alpha = 0.35f + 0.65f * hitFlash),
-        Offset(laneLeftX, cueRowY - 10f),
-        Offset(laneLeftX, targetRowY + 10f),
+        Offset(laneLeftX, cueRowY - 14f * noteScale),
+        Offset(laneLeftX, targetRowY + 14f * noteScale),
         strokeWidth = 3f + 6f * hitFlash,
     )
 
@@ -73,8 +82,8 @@ internal fun DrawScope.drawNoteHighway(
             if (until < -0.05 || until > lookaheadBeats) continue
             val x = laneLeftX + (until / lookaheadBeats).toFloat() * (laneRightX - laneLeftX)
             when (note.shape) {
-                NoteShape.DOT -> drawCircle(note.color, radius = note.radius, center = Offset(x, y))
-                NoteShape.SWIPE -> drawSwipeMarker(Offset(x, y), note.radius, note.color)
+                NoteShape.DOT -> drawCircle(note.color, radius = note.radius * noteScale, center = Offset(x, y))
+                NoteShape.SWIPE -> drawSwipeMarker(Offset(x, y), note.radius * noteScale, note.color)
             }
         }
     }

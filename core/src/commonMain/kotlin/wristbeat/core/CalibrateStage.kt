@@ -2,7 +2,7 @@ package wristbeat.core
 
 import kotlin.math.round
 
-const val CALIBRATE_TOTAL_BEATS = 36
+const val CALIBRATE_TOTAL_BEATS = 20
 const val CALIBRATE_COUNT_IN_BEATS = 4
 const val CALIBRATE_MIN_TAPS = 6
 

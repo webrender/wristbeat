@@ -155,7 +155,7 @@ fun CalibrateScreen(onCalibrated: (offsetMs: Double) -> Unit) {
             drawCircle(color = Color(0xFF0E3A3D), radius = radius, center = stageCenter)
             drawCircle(color = Color.White.copy(alpha = 0.10f), radius = safeRadius, center = stageCenter, style = Stroke(width = 3f))
 
-            // Progress ring: how far through the fixed 36-beat run we are, so "how long is this"
+            // Progress ring: how far through the fixed-length run we are, so "how long is this"
             // has a visible answer instead of just a number.
             if (started) {
                 val progress = (beatPosition / CALIBRATE_TOTAL_BEATS).coerceIn(0.0, 1.0).toFloat()
