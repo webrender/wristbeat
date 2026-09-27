@@ -1,134 +1,38 @@
 package wristbeat.app
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.delay
-import wristbeat.core.ScoreTally
-
-/** Below this width the stage tabs and a stage's top HUD can't share the top edge side by side. */
-internal val COMPACT_HUD_MAX_WIDTH = 720.dp
 
 /**
- * How [App] has laid out the shared chrome, so each stage's top HUD can stay clear of it. On a wide
- * screen the tabs sit in the top-right corner and the stage HUD stacks in the top-left. On a
- * compact (phone) screen the tabs span the top edge, so the stage HUD starts [topInset] below it.
- *
- * [watch] is the Wear OS layout ([WatchStageScreen]): the watch's native menu owns stage switching,
- * titles, the chart toggle and legends, so a stage shows no top HUD at all, and its status panel
- * uses smaller text and only the lines that fit on a round face.
+ * [watch] is the Wear OS layout ([WatchStageScreen]): HUD text and chips shrink to fit a small
+ * round face, and status panels drop to fewer lines. Phone/web stages carry no other layout state
+ * of their own — stage switching and the chart toggle live in the main menu, not in per-stage chrome.
  */
-internal data class HudLayout(val compact: Boolean = false, val topInset: Dp = 0.dp, val watch: Boolean = false)
+internal data class HudLayout(val watch: Boolean = false)
 
 internal val LocalHudLayout = compositionLocalOf { HudLayout() }
 
-/** The app-wide note highway ("chart") setting, shown as a toggle on stages that have a highway. */
+/** The app-wide note highway ("chart") setting, shown as a toggle in the main menu. */
 data class ChartSetting(val on: Boolean, val onToggle: () -> Unit)
 
-/**
- * A stage's top-of-screen HUD: its title, the chart toggle (if the stage has a note highway), and
- * its input legend. Wide screens stack them in the top-left corner, clear of the tabs in the
- * top-right. Compact screens drop the title (the selected tab already names the stage) and flow
- * the rest in centered rows under the tabs.
- */
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-internal fun BoxScope.StageHeader(
-    title: String,
-    titleColor: Color,
-    chart: ChartSetting? = null,
-    legend: (@Composable () -> Unit)? = null,
-) {
-    val layout = LocalHudLayout.current
-    if (layout.watch) return
-    if (layout.compact) {
-        FlowRow(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .windowInsetsPadding(WindowInsets.safeDrawing)
-                .fillMaxWidth()
-                .padding(start = 16.dp, end = 16.dp, top = layout.topInset),
-            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            if (chart != null) ChartToggle(chart)
-            if (legend != null) HudChip { legend() }
-        }
-    } else {
-        Column(
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .windowInsetsPadding(WindowInsets.safeDrawing)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            HudChip { HudText(title, color = titleColor) }
-            if (chart != null) ChartToggle(chart)
-            if (legend != null) HudChip { legend() }
-        }
-    }
-}
-
-/** How long a stage's instructions stay up on a watch before fading, so they don't cover the game. */
-private const val WATCH_INSTRUCTIONS_MS = 3000L
-
-/**
- * On a watch, shows [content] when it first appears (and again whenever [key] changes), then fades
- * it out after [WATCH_INSTRUCTIONS_MS]; the small round face can't spare room for instructions
- * that stay up. Elsewhere [content] just stays.
- */
-@Composable
-internal fun WatchAutoHide(key: Any, content: @Composable () -> Unit) {
-    if (!LocalHudLayout.current.watch) {
-        content()
-        return
-    }
-    var visible by remember(key) { mutableStateOf(true) }
-    LaunchedEffect(key) {
-        delay(WATCH_INSTRUCTIONS_MS)
-        visible = false
-    }
-    AnimatedVisibility(visible = visible, enter = fadeIn(), exit = fadeOut()) { content() }
-}
-
-/** Distance of a stage's bottom status panel from the screen edge; higher on a watch, where a round face narrows toward the bottom. */
+/** Distance of a stage's status panel from the screen edge; higher on a watch, where a round face narrows toward the bottom. */
 internal val statusBottomPadding: Dp
     @Composable get() = if (LocalHudLayout.current.watch) 30.dp else 28.dp
 
-/** The Perfect/OK/Miss readout under a stage's status line, abbreviated to fit a watch. */
-@Composable
-internal fun tallyLine(tally: ScoreTally): String =
-    if (LocalHudLayout.current.watch) "P ${tally.perfect} · OK ${tally.ok} · Miss ${tally.miss}"
-    else "Perfect ${tally.perfect} · OK ${tally.ok} · Miss ${tally.miss}"
-
 /**
  * Tells [onRunningChanged] whether a run is in progress, and that it isn't once the stage leaves
- * the screen. The watch uses this to hold off swipe-to-dismiss (so a sloppy swipe can't quit
- * mid-run) and to keep the screen awake while playing.
+ * the screen. The watch uses this to hold off swipe-to-dismiss (so a sloppy tap or a Mango Chop
+ * slice can't quit mid-run) and to keep the screen awake while playing; the phone/web app uses it
+ * to disable the Escape/back-gesture shortcut back to the menu while a run is in progress.
  */
 @Composable
 internal fun ReportRunning(running: Boolean, onRunningChanged: (Boolean) -> Unit) {
@@ -139,11 +43,16 @@ internal fun ReportRunning(running: Boolean, onRunningChanged: (Boolean) -> Unit
 
 /** Lets a player hide the note highway (the "visual beat indicator chart") and play by ear alone. */
 @Composable
-private fun ChartToggle(chart: ChartSetting) {
+internal fun ChartToggle(chart: ChartSetting, modifier: Modifier = Modifier, fontSize: TextUnit = TextUnit.Unspecified) {
     GameButton(
+        modifier = modifier,
         accent = if (chart.on) Color(0xFF2FBF9E) else Color(0xFF16302D),
         onClick = chart.onToggle,
     ) {
-        HudText(if (chart.on) "Chart: on" else "Chart: off", color = if (chart.on) Color(0xFF06211D) else Color(0xFFAAB8B5))
+        HudText(
+            if (chart.on) "Chart: on" else "Chart: off",
+            color = if (chart.on) Color(0xFF06211D) else Color(0xFFAAB8B5),
+            fontSize = fontSize,
+        )
     }
 }

@@ -1,15 +1,8 @@
 package wristbeat.app
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -17,29 +10,47 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 
-// Calibrate opens first by default per Jeremy's feedback on the prototype.
-// shortLabel is what the tabs show on a compact (phone-width) screen, where the full labels don't fit in one row.
-enum class Stage(val label: String, val shortLabel: String, val enabled: Boolean) {
-    CALIBRATE("Calibrate", "Calibrate", enabled = true),
-    SNAP_CRABS("Snap Crabs", "Crabs", enabled = true),
-    MANGO_CHOP("Mango Chop", "Mango", enabled = true),
+// Calibrate opens first in the menu per Jeremy's feedback on the prototype.
+enum class Stage(val label: String, val enabled: Boolean) {
+    CALIBRATE("Calibrate", enabled = true),
+    SNAP_CRABS("Snap Crabs", enabled = true),
+    MANGO_CHOP("Mango Chop", enabled = true),
 }
 
+/** Each stage's accent color, shared by the main menu here and the Wear menu in `wearApp`. */
+val Stage.accent: Color
+    get() = when (this) {
+        Stage.CALIBRATE -> Color(0xFF2FBF9E)
+        Stage.SNAP_CRABS -> Color(0xFFF07A5E)
+        Stage.MANGO_CHOP -> Color(0xFFFFB320)
+    }
+
 /**
- * No app chrome: each stage owns the whole screen and draws its own title/HUD. The only shared UI
- * is a small tab strip for switching stages, floated over the game in a corner like an in-game menu
- * rather than sitting in a page header above the content.
+ * The phone/watch system back gesture/button (Android) or nothing (web, where [App] handles
+ * Escape directly instead — there's no system back gesture to hook in a browser).
+ */
+@Composable
+internal expect fun StageBackHandler(enabled: Boolean, onBack: () -> Unit)
+
+/**
+ * No app chrome while a stage is being played: picking a stage, toggling the chart and reading the
+ * calibration offset all happen in [MainMenu] instead, so each stage screen is just the game itself.
+ * Getting back to the menu is a gesture, not a button — Escape on the browser, the system back
+ * gesture/button on Android — and only works while nothing is running, so it can't be hit by
+ * accident mid-run.
  */
 @Composable
 fun App() {
-    var stage by remember { mutableStateOf(Stage.CALIBRATE) }
+    var stage by remember { mutableStateOf<Stage?>(null) }
+    var running by remember { mutableStateOf(false) }
     // Calibrate's measured tap offset, saved per audio output and applied to Snap Crabs and Mango Chop.
     val calibration = rememberCalibration()
 
@@ -48,50 +59,45 @@ fun App() {
     var showChart by remember { mutableStateOf(true) }
     val chart = ChartSetting(showChart) { showChart = !showChart }
 
+    val backEnabled = stage != null && !running
+    StageBackHandler(enabled = backEnabled) { stage = null }
+
     MaterialTheme {
-        BoxWithConstraints(modifier = Modifier.fillMaxSize().background(Color(0xFF0F1B19))) {
-            // On a phone-width screen the tabs span the top edge and each stage's HUD starts below
-            // them; elsewhere the tabs sit in the top-right corner, clear of the stage HUD's top-left column.
-            val compact = maxWidth < COMPACT_HUD_MAX_WIDTH
-            val density = LocalDensity.current
-            var tabsHeight by remember { mutableStateOf(0.dp) }
-            val hudLayout = HudLayout(compact, topInset = if (compact) 16.dp + tabsHeight + 8.dp else 0.dp)
-
-            CompositionLocalProvider(LocalHudLayout provides hudLayout) {
-                when (stage) {
-                    Stage.CALIBRATE -> CalibrateScreen(calibration)
-                    Stage.SNAP_CRABS -> SnapCrabsScreen(calibration, chart)
-                    Stage.MANGO_CHOP -> MangoChopScreen(calibration, chart)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0xFF0F1B19))
+                .onKeyEvent { event ->
+                    if (backEnabled && event.type == KeyEventType.KeyDown && event.key == Key.Escape) {
+                        stage = null
+                        true
+                    } else {
+                        false
+                    }
+                },
+        ) {
+            CompositionLocalProvider(LocalHudLayout provides HudLayout()) {
+                val current = stage
+                if (current == null) {
+                    MainMenu(
+                        calibration = calibration,
+                        chart = chart,
+                        // Unlocks the browser's AudioContext synchronously inside this click, since
+                        // the stage's own auto-start (see e.g. SnapCrabsScreen) happens a frame later
+                        // in a LaunchedEffect, too late for autoplay policies to allow it.
+                        onSelect = {
+                            AudioClock().start()
+                            stage = it
+                        },
+                    )
+                } else {
+                    val onMenu: () -> Unit = { stage = null }
+                    when (current) {
+                        Stage.CALIBRATE -> CalibrateScreen(calibration, onRunningChanged = { running = it }, onMenu = onMenu)
+                        Stage.SNAP_CRABS -> SnapCrabsScreen(calibration, chart, onRunningChanged = { running = it }, onMenu = onMenu)
+                        Stage.MANGO_CHOP -> MangoChopScreen(calibration, chart, onRunningChanged = { running = it }, onMenu = onMenu)
+                    }
                 }
-            }
-            StageTabs(
-                current = stage,
-                onSelect = { stage = it },
-                compact = compact,
-                modifier = Modifier
-                    .align(if (compact) Alignment.TopCenter else Alignment.TopEnd)
-                    .windowInsetsPadding(WindowInsets.safeDrawing)
-                    .padding(16.dp)
-                    .onSizeChanged { tabsHeight = with(density) { it.height.toDp() } },
-            )
-        }
-    }
-}
-
-@Composable
-private fun StageTabs(current: Stage, onSelect: (Stage) -> Unit, compact: Boolean, modifier: Modifier = Modifier) {
-    Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        for (s in Stage.entries) {
-            val selected = s == current
-            GameButton(
-                accent = if (selected) Color(0xFF2FBF9E) else Color(0xFF16302D),
-                enabled = s.enabled,
-                onClick = { onSelect(s) },
-            ) {
-                HudText(
-                    text = (if (compact) s.shortLabel else s.label).let { if (s.enabled) it else "$it · soon" },
-                    color = if (selected) Color(0xFF06211D) else Color.White.copy(alpha = if (s.enabled) 0.9f else 0.4f),
-                )
             }
         }
     }
@@ -99,9 +105,9 @@ private fun StageTabs(current: Stage, onSelect: (Stage) -> Unit, compact: Boolea
 
 /**
  * One stage on its own, laid out for a Wear OS watch: the watch's native menu (in `wearApp`)
- * handles stage switching, the chart toggle and the calibration readout, so there are no tabs or
- * top HUD here, just the game and a small status panel. [onRunningChanged] reports whether a run
- * is in progress, so the watch can hold off swipe-to-dismiss and keep the screen on while playing.
+ * handles stage switching, the chart toggle and the calibration readout, so there's no menu button
+ * here, just the game. [onRunningChanged] reports whether a run is in progress, so the watch can
+ * hold off swipe-to-dismiss and keep the screen on while playing.
  */
 @Composable
 fun WatchStageScreen(

@@ -38,6 +38,10 @@ kotlin {
             implementation(compose.ui)
             implementation(compose.components.resources)
         }
+        androidMain.dependencies {
+            // BackHandler, for the phone/watch back gesture that returns to the main menu.
+            implementation("androidx.activity:activity-compose:1.9.3")
+        }
     }
 }
 

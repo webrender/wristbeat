@@ -39,7 +39,6 @@ import kotlin.math.floor
 import kotlin.math.round
 import kotlin.math.roundToInt
 import kotlin.math.sin
-import wristbeat.core.CALIBRATE_COUNT_IN_BEATS
 import wristbeat.core.CALIBRATE_TOTAL_BEATS
 import wristbeat.core.CalibrateResult
 import wristbeat.core.CalibrateStage
@@ -57,7 +56,7 @@ import wristbeat.core.SECONDS_PER_BEAT
  * The result is saved for the current audio output (see [Calibration]).
  */
 @Composable
-fun CalibrateScreen(calibration: Calibration, onRunningChanged: (Boolean) -> Unit = {}) {
+fun CalibrateScreen(calibration: Calibration, onRunningChanged: (Boolean) -> Unit = {}, onMenu: (() -> Unit)? = null) {
     val audioClock = remember { AudioClock() }
     val audioEngine = remember { AudioEngine() }
     val haptics = remember { HapticEngine() }
@@ -70,11 +69,8 @@ fun CalibrateScreen(calibration: Calibration, onRunningChanged: (Boolean) -> Uni
     var beatPosition by remember { mutableStateOf(-1.0) }
     var lastFiredBeat by remember { mutableStateOf(-1) }
     var flashPhase by remember { mutableStateOf(0f) }
-    var tapCount by remember { mutableStateOf(0) }
     var recentErrors by remember { mutableStateOf(listOf<Double>()) }
     var result by remember { mutableStateOf<CalibrateResult?>(null) }
-    val runLengthSeconds = remember { (CALIBRATE_TOTAL_BEATS * SECONDS_PER_BEAT).roundToInt() }
-    val watch = LocalHudLayout.current.watch
     ReportRunning(started && !finished, onRunningChanged)
 
     // Look-ahead scheduler + per-frame beat position, mirroring the prototype's 25ms-interval
@@ -115,30 +111,31 @@ fun CalibrateScreen(calibration: Calibration, onRunningChanged: (Boolean) -> Uni
         }
     }
 
+    fun restart() {
+        audioClock.start()
+        t0 = audioClock.now() + 0.3
+        scheduledIndex = 0
+        lastFiredBeat = -1
+        beatPosition = -1.0
+        recentErrors = emptyList()
+        result = null
+        finished = false
+        started = true
+    }
+
     fun handleTap() {
-        if (!started) {
-            audioClock.start()
-            t0 = audioClock.now() + 0.3
-            scheduledIndex = 0
-            lastFiredBeat = -1
-            beatPosition = -1.0
-            tapCount = 0
-            recentErrors = emptyList()
-            result = null
-            finished = false
-            started = true
-            return
-        }
-        if (finished) {
-            started = false
+        if (!started || finished) {
+            restart()
             return
         }
         val beat = (audioClock.now() - t0) / SECONDS_PER_BEAT
         val errorMs = stage.recordTap(beat)
         haptics.pulse() // confirms the tap registered; never plays a sound here (see class doc)
-        tapCount = stage.tapCount
         if (errorMs != null) recentErrors = (recentErrors + errorMs).takeLast(16)
     }
+
+    // The stage begins as soon as it's opened — no tap needed to start the click track.
+    LaunchedEffect(Unit) { restart() }
 
     // A single full-bleed canvas with the status readout floated on top as a HUD overlay — no
     // header/footer flow layout, so the dial always fills the whole screen edge to edge.
@@ -192,71 +189,31 @@ fun CalibrateScreen(calibration: Calibration, onRunningChanged: (Boolean) -> Uni
             drawCircle(Color.White, radius = 6f, center = target)
         }
 
-        StageHeader("Calibrate", Color(0xFF2FBF9E))
-
-        Column(
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = statusBottomPadding),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            when {
-                result != null -> {
-                    val r = result!!
-                    HudChip {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            HudText(
-                                if (r.ok) "Offset set: ${formatMs(r.offsetMs)}" else "Not enough taps — try again",
-                                loud = true,
-                            )
-                            Spacer(Modifier.height(2.dp))
-                            if (!watch) {
-                                val forOutput = calibration.output.label?.takeIf { r.ok }?.let { " · saved for $it" } ?: ""
-                                HudText("from ${r.tapCount} taps$forOutput", color = Color(0xFFAAB8B5))
-                            }
-                            HudText("Tap to try again", color = Color(0xFFAAB8B5))
-                        }
-                    }
-                }
-                !started -> WatchAutoHide("idle") {
-                    HudChip {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            HudText("Tap to start", loud = true)
-                            Spacer(Modifier.height(2.dp))
-                            HudText(
-                                if (watch) {
-                                    "~${runLengthSeconds}s · tap every beat"
-                                } else {
-                                    "$CALIBRATE_TOTAL_BEATS beats, about ${runLengthSeconds}s — a $CALIBRATE_COUNT_IN_BEATS-beat " +
-                                        "count-in, then tap every click you hear"
-                                },
-                                color = Color(0xFFAAB8B5),
-                            )
-                            // Recalibrate per output: the watch menu shows the offset instead.
-                            if (!watch) HudText(calibration.statusLine(), color = Color(0xFFAAB8B5))
-                        }
-                    }
-                }
-                else -> {
-                    val beatIndex = floor(beatPosition).toInt()
-                    // The timing strip stays up on a watch; only the prompt fades.
-                    WatchAutoHide("run") {
-                        HudChip {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                HudText(if (beatIndex < CALIBRATE_COUNT_IN_BEATS) "Get ready…" else "Tap to the sound", loud = true)
-                                Spacer(Modifier.height(2.dp))
-                                val shownBeat = beatIndex.coerceIn(0, CALIBRATE_TOTAL_BEATS)
-                                HudText(
-                                    if (watch) "Beat $shownBeat/$CALIBRATE_TOTAL_BEATS · $tapCount taps"
-                                    else "Beat $shownBeat of $CALIBRATE_TOTAL_BEATS  ·  $tapCount taps",
-                                    color = Color(0xFFAAB8B5),
-                                )
-                            }
-                        }
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    TimingStrip(recentErrors)
-                }
+        // The timing strip is live feedback on the run itself (like the other stages' note
+        // highway), not instructional chrome, so it stays up while a run is in progress.
+        if (started && !finished) {
+            Column(
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = statusBottomPadding),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                TimingStrip(recentErrors)
             }
         }
+
+        val r = result
+        StageResults(
+            visible = r != null,
+            accent = Color(0xFF2FBF9E),
+            sound = null, // Calibrate isn't scored pass/fail, so no cheer/boo here.
+            audioEngine = audioEngine,
+            audioClock = audioClock,
+            headline = if (r?.ok == true) "Offset set" else "Not enough taps",
+            heroValue = r?.let { abs(it.offsetMs).roundToInt() } ?: 0,
+            heroFormat = { n -> if (r?.ok == true) "${if (r.offsetMs >= 0) "+" else "−"}${n}ms" else "" },
+            stats = if (r?.ok == true) listOf(StatCounter("Taps", r.tapCount)) else emptyList(),
+            onRestart = ::restart,
+            onMenu = onMenu,
+        )
     }
 }
 

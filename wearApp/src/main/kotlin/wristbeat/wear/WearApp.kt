@@ -32,6 +32,7 @@ import kotlin.math.roundToInt
 import wristbeat.app.ChartSetting
 import wristbeat.app.Stage
 import wristbeat.app.WatchStageScreen
+import wristbeat.app.accent
 import wristbeat.app.rememberCalibration
 import wristbeat.app.wristbeatFontFamily
 
@@ -139,14 +140,6 @@ private fun StageMenu(
         }
     }
 }
-
-/** Each stage's color in the menu, matching its in-game accent. */
-private val Stage.accent: Color
-    get() = when (this) {
-        Stage.CALIBRATE -> Teal
-        Stage.SNAP_CRABS -> Color(0xFFF07A5E)
-        Stage.MANGO_CHOP -> Color(0xFFFFB320)
-    }
 
 private val WristbeatColors = Colors(
     primary = Teal,

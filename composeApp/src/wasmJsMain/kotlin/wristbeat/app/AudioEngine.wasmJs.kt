@@ -93,6 +93,25 @@ actual class AudioEngine actual constructor() {
                 jsOscRamp(ctx, "sine", freq, freq * 0.6, atSeconds, 0.004, 0.55, 0.2)
                 jsNoise(ctx, noise, atSeconds, 0.03, 0.1, "bandpass", 1200.0, 1.0)
             }
+            // Results screen stinger for a pass: a bright rising arpeggio over a crowd-like noise whoosh.
+            SoundId.CHEER -> {
+                jsNoise(ctx, noise, atSeconds, 0.6, 0.18, "bandpass", 2200.0, 0.6)
+                for ((i, note) in listOf(60.0, 64.0, 67.0, 72.0, 76.0).withIndex()) {
+                    val tt = atSeconds + i * 0.07
+                    val freq = mtof(note)
+                    jsOsc(ctx, "triangle", freq, tt, 0.006, 0.16, 0.22)
+                    jsOsc(ctx, "square", freq, tt, 0.006, 0.05, 0.12)
+                }
+            }
+            // Results screen stinger for a fail: a classic sad-trombone descent over a dull crowd rumble.
+            SoundId.BOO -> {
+                jsNoise(ctx, noise, atSeconds, 0.9, 0.14, "lowpass", 700.0, 0.8)
+                for ((i, note) in listOf(67.0, 65.0, 64.0, 60.0).withIndex()) {
+                    val tt = atSeconds + i * 0.22
+                    val freq = mtof(note)
+                    jsOscRamp(ctx, "sawtooth", freq, freq * 0.94, tt, 0.02, 0.22, 0.24)
+                }
+            }
         }
     }
 }

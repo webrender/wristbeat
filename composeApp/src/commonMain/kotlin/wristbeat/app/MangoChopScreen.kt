@@ -3,14 +3,10 @@ package wristbeat.app
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -18,7 +14,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameMillis
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -47,9 +42,6 @@ import kotlin.math.sin
 import wristbeat.core.ChopAction
 import wristbeat.core.Fruit
 import wristbeat.core.Grade
-import wristbeat.core.MANGO_CHOP_END_BEATS
-import wristbeat.core.MangoChopSong
-import wristbeat.core.MANGO_CHOP_BPM
 import wristbeat.core.MangoChopStage
 import wristbeat.core.Rank
 import wristbeat.core.ScoreTally
@@ -80,7 +72,12 @@ private enum class Cut { NONE, LEFT, RIGHT, TOP, BOTTOM }
  * On desktop, a mouse drag works the same way, and D/K/arrows slice (see [rememberTapKeyModifier]).
  */
 @Composable
-fun MangoChopScreen(calibration: Calibration, chart: ChartSetting, onRunningChanged: (Boolean) -> Unit = {}) {
+fun MangoChopScreen(
+    calibration: Calibration,
+    chart: ChartSetting,
+    onRunningChanged: (Boolean) -> Unit = {},
+    onMenu: (() -> Unit)? = null,
+) {
     val audioClock = remember { AudioClock() }
     val audioEngine = remember { AudioEngine() }
     val haptics = remember { HapticEngine() }
@@ -97,13 +94,10 @@ fun MangoChopScreen(calibration: Calibration, chart: ChartSetting, onRunningChan
     var slashAngle by remember { mutableStateOf(0f) }
     var keySlashFlip by remember { mutableStateOf(false) }
     var tally by remember { mutableStateOf(ScoreTally()) }
-    val runLengthSeconds = remember { (MANGO_CHOP_END_BEATS * secondsPerBeat).roundToInt() }
-    val watch = LocalHudLayout.current.watch
     ReportRunning(started && !finished, onRunningChanged)
-    // Highway: each toss's whistle on the cue row, and its landing (the beat to act on) on the
-    // target row. Pineapples are swipe arrows, since they take a swipe rather than a tap.
-    val highwayCues = remember(stage) { stage.tosses.map { highwayNote(it.fruit, it.beat, cue = true) } }
-    val highwayTargets = remember(stage) { stage.tosses.map { highwayNote(it.fruit, it.landBeat, cue = false) } }
+    // Highway: each toss's landing (the beat to act on). Pineapples are swipe arrows, since they
+    // take a swipe rather than a tap.
+    val highwayTargets = remember(stage) { stage.tosses.map { highwayNote(it.fruit, it.landBeat) } }
 
     LaunchedEffect(started, finished) {
         var lastFrameMillis = 0L
@@ -138,25 +132,25 @@ fun MangoChopScreen(calibration: Calibration, chart: ChartSetting, onRunningChan
 
     fun beatNow(): Double = (audioClock.now() - t0) / secondsPerBeat
 
+    fun restart() {
+        audioClock.start()
+        calibration.refreshOutput()
+        // Fresh stage per run: judged tosses and the tally don't carry over into a replay.
+        stage = MangoChopStage(calibration.inputOffsetMs)
+        t0 = audioClock.now() + 0.3
+        scheduledIndex = 0
+        beatPosition = -1.0
+        sinceChop = 10f
+        sinceSlash = 10f
+        tally = ScoreTally()
+        finished = false
+        started = true
+    }
+
     /** Starts or restarts a run; returns false when a run is in progress and the input is gameplay. */
     fun handleMenuPress(): Boolean {
-        if (!started) {
-            audioClock.start()
-            calibration.refreshOutput()
-            // Fresh stage per run: judged tosses and the tally don't carry over into a replay.
-            stage = MangoChopStage(calibration.inputOffsetMs)
-            t0 = audioClock.now() + 0.3
-            scheduledIndex = 0
-            beatPosition = -1.0
-            sinceChop = 10f
-            sinceSlash = 10f
-            tally = ScoreTally()
-            finished = false
-            started = true
-            return true
-        }
-        if (finished) {
-            started = false
+        if (!started || finished) {
+            restart()
             return true
         }
         return false
@@ -198,6 +192,9 @@ fun MangoChopScreen(calibration: Calibration, chart: ChartSetting, onRunningChan
         keySlashFlip = !keySlashFlip
         act(ChopAction.SLICE, beatNow(), if (keySlashFlip) -20f else 20f)
     }
+
+    // The stage begins as soon as it's opened — no tap needed to start the song.
+    LaunchedEffect(Unit) { restart() }
 
     Box(
         modifier = Modifier
@@ -243,11 +240,9 @@ fun MangoChopScreen(calibration: Calibration, chart: ChartSetting, onRunningChan
 
             if (chart.on) {
                 drawNoteHighway(
-                    cues = highwayCues,
                     targets = highwayTargets,
                     beatPosition = beatPosition,
-                    // Same scroll speed as Snap Crabs' 2.5 beats at 116 BPM, and a mango's whistle
-                    // (2 beats ahead of its landing) is on screen together with the landing.
+                    // Same scroll speed as Snap Crabs' 2.5 beats at 116 BPM.
                     lookaheadBeats = 3.0,
                     hitFlash = highwayFlash(beatPosition, stage.tosses, secondsPerBeat),
                     laneY = squareTop + 0.36f * squareExtent,
@@ -277,83 +272,40 @@ fun MangoChopScreen(calibration: Calibration, chart: ChartSetting, onRunningChan
             }
         }
 
-        StageHeader("Mango Chop", Color(0xFFFFB320), chart) {
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                LegendDot(Color(0xFFFFB320), "Tap: chop")
-                LegendDot(Color(0xFFE8A93A), "Swipe: slice", NoteShape.SWIPE)
-            }
-        }
-
-        Column(
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = statusBottomPadding),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            when {
-                finished -> {
-                    val rank = when (tally.rank) {
-                        Rank.SUPERB -> "Superb!"
-                        Rank.OK -> "OK"
-                        Rank.TRY_AGAIN -> "Try again"
-                    }
-                    HudChip {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            HudText(rank, loud = true)
-                            Spacer(Modifier.height(2.dp))
-                            HudText(tallyLine(tally), color = Color(0xFFAAB8B5))
-                            HudText("Tap to try again", color = Color(0xFFAAB8B5))
-                        }
-                    }
-                }
-                !started -> WatchAutoHide("idle") {
-                    HudChip {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            HudText("Tap to start", loud = true)
-                            Spacer(Modifier.height(2.dp))
-                            if (watch) {
-                                // No keyboard on a watch, and the menu shows the calibration offset.
-                                HudText("Tap: chop · swipe: slice", color = Color(0xFFAAB8B5))
-                            } else {
-                                HudText(
-                                    "Chop mangoes and limes as they land, swipe to slice pineapples " +
-                                        "(~${runLengthSeconds}s, ${MANGO_CHOP_BPM.toInt()} BPM)",
-                                    color = Color(0xFFAAB8B5),
-                                )
-                                HudText("Keys: Space/J/F chop · D/K/arrows slice", color = Color(0xFFAAB8B5))
-                                HudText(calibration.statusLine(), color = Color(0xFFAAB8B5))
-                            }
-                        }
-                    }
-                }
-                else -> WatchAutoHide("run") {
-                    HudChip {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            HudText(runLabel(beatPosition, stage), loud = true)
-                            Spacer(Modifier.height(2.dp))
-                            HudText(tallyLine(tally), color = Color(0xFFAAB8B5))
-                        }
-                    }
-                }
-            }
-        }
+        StageResults(
+            visible = finished,
+            accent = Color(0xFFFFB320),
+            sound = if (tally.rank == Rank.TRY_AGAIN) SoundId.BOO else SoundId.CHEER,
+            audioEngine = audioEngine,
+            audioClock = audioClock,
+            headline = when (tally.rank) {
+                Rank.SUPERB -> "Superb!"
+                Rank.OK -> "OK"
+                Rank.TRY_AGAIN -> "Try again"
+            },
+            heroValue = (tally.score * 100).roundToInt(),
+            heroFormat = { "$it%" },
+            stats = listOf(
+                StatCounter("Perfect", tally.perfect),
+                StatCounter("OK", tally.ok),
+                StatCounter("Miss", tally.miss),
+            ),
+            onRestart = ::restart,
+            onMenu = onMenu,
+        )
     }
 }
 
-private fun runLabel(beat: Double, stage: MangoChopStage): String = when {
-    beat < MangoChopSong.VERSE -> "Get ready…"
-    beat > stage.tosses.last().landBeat + 1 -> "Nice chopping!"
-    else -> "Chop on the landing"
-}
-
-private fun highwayNote(fruit: Fruit, beat: Double, cue: Boolean): HighwayNote {
+private fun highwayNote(fruit: Fruit, beat: Double): HighwayNote {
     val color = when (fruit) {
         Fruit.MANGO -> Color(0xFFFFB320)
         Fruit.LIME -> Color(0xFF86C537)
         Fruit.PINEAPPLE -> Color(0xFFE8A93A)
     }
-    return when {
-        fruit == Fruit.PINEAPPLE -> HighwayNote(beat, if (cue) color.copy(alpha = 0.75f) else color, if (cue) 7f else 10f, NoteShape.SWIPE)
-        cue -> HighwayNote(beat, color.copy(alpha = 0.75f), 6f)
-        else -> HighwayNote(beat, color, 8f)
+    return if (fruit == Fruit.PINEAPPLE) {
+        HighwayNote(beat, color, 10f, NoteShape.SWIPE)
+    } else {
+        HighwayNote(beat, color, 8f)
     }
 }
 
@@ -403,7 +355,7 @@ private fun DrawScope.drawMarketBackground(squareLeft: Float, squareTop: Float, 
     while (squareLeft + i * stripe - stripe / 2f < w) {
         val cx = squareLeft + i * stripe
         val color = if (abs(i) % 2 == 1) Color(0xFFFFF3DC) else Color(0xFFE4513A)
-        drawRect(color, topLeft = Offset(cx - stripe / 2f, 0f), size = Size(stripe, awningHeight))
+        drawRect(color, topLeft = Offset(cx - stripe / 2f, 0f), size = Size(stripe, awningHeight + sway))
         drawArc(
             color = color,
             startAngle = 0f,

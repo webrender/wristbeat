@@ -3,17 +3,12 @@ package wristbeat.app
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -21,7 +16,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameMillis
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -45,23 +39,23 @@ import kotlin.math.sin
 import wristbeat.core.Grade
 import wristbeat.core.Rank
 import wristbeat.core.SECONDS_PER_BEAT
-import wristbeat.core.SNAP_CRABS_END_BEATS
 import wristbeat.core.ScoreTally
-import wristbeat.core.SnapCrabsSong
 import wristbeat.core.SnapCrabsStage
 import wristbeat.core.SoundId
 
-private const val CALL_BAR_BEATS = 4.0
-private const val CYCLE_BEATS = 8.0
-
 /**
  * Snap Crabs: the lead crab snaps a pattern, then it's the player's turn one bar later.
- * A note highway (like a rhythm game's approaching notes) shows upcoming call and response
+ * A note highway (like a rhythm game's approaching notes) shows the player's upcoming response
  * beats sliding toward a fixed hit line, so exactly when a tap is expected is visible ahead
  * of time, not just reacted to after the fact.
  */
 @Composable
-fun SnapCrabsScreen(calibration: Calibration, chart: ChartSetting, onRunningChanged: (Boolean) -> Unit = {}) {
+fun SnapCrabsScreen(
+    calibration: Calibration,
+    chart: ChartSetting,
+    onRunningChanged: (Boolean) -> Unit = {},
+    onMenu: (() -> Unit)? = null,
+) {
     val audioClock = remember { AudioClock() }
     val audioEngine = remember { AudioEngine() }
     val haptics = remember { HapticEngine() }
@@ -80,10 +74,7 @@ fun SnapCrabsScreen(calibration: Calibration, chart: ChartSetting, onRunningChan
     var targetPulsePhase by remember { mutableStateOf(0f) }
     var playerPulsePhase by remember { mutableStateOf(0f) }
     var tally by remember { mutableStateOf(ScoreTally()) }
-    val runLengthSeconds = remember { (SNAP_CRABS_END_BEATS * SECONDS_PER_BEAT).roundToInt() }
-    val watch = LocalHudLayout.current.watch
     ReportRunning(started && !finished, onRunningChanged)
-    val highwayCues = remember(stage) { stage.leadCues.map { HighwayNote(it, Color(0xFFDE4636).copy(alpha = 0.75f), 6f) } }
     val highwayTargets = remember(stage) { stage.targets.map { HighwayNote(it, Color(0xFF6FB6FF), 8f) } }
 
     LaunchedEffect(started, finished) {
@@ -134,26 +125,26 @@ fun SnapCrabsScreen(calibration: Calibration, chart: ChartSetting, onRunningChan
         }
     }
 
+    fun restart() {
+        audioClock.start()
+        calibration.refreshOutput()
+        // Fresh stage per run: judged targets and the tally don't carry over into a replay.
+        stage = SnapCrabsStage(calibration.inputOffsetMs)
+        t0 = audioClock.now() + 0.3
+        scheduledIndex = 0
+        lastFiredBeat = -1
+        beatPosition = -1.0
+        nextLeadCueIndex = 0
+        nextTargetIndex = 0
+        targetPulsePhase = 0f
+        tally = ScoreTally()
+        finished = false
+        started = true
+    }
+
     fun handleTap() {
-        if (!started) {
-            audioClock.start()
-            calibration.refreshOutput()
-            // Fresh stage per run: judged targets and the tally don't carry over into a replay.
-            stage = SnapCrabsStage(calibration.inputOffsetMs)
-            t0 = audioClock.now() + 0.3
-            scheduledIndex = 0
-            lastFiredBeat = -1
-            beatPosition = -1.0
-            nextLeadCueIndex = 0
-            nextTargetIndex = 0
-            targetPulsePhase = 0f
-            tally = ScoreTally()
-            finished = false
-            started = true
-            return
-        }
-        if (finished) {
-            started = false
+        if (!started || finished) {
+            restart()
             return
         }
         val now = audioClock.now()
@@ -170,7 +161,10 @@ fun SnapCrabsScreen(calibration: Calibration, chart: ChartSetting, onRunningChan
         tally = stage.tally()
     }
 
-    // A single full-bleed canvas with the legend/status floated on top as a HUD overlay — no
+    // The stage begins as soon as it's opened — no tap needed to start the song.
+    LaunchedEffect(Unit) { restart() }
+
+    // A single full-bleed canvas with the results screen floated on top once a run finishes — no
     // header/footer flow layout, so the beach and crabs always fill the whole screen edge to edge.
     Box(
         modifier = Modifier
@@ -191,7 +185,6 @@ fun SnapCrabsScreen(calibration: Calibration, chart: ChartSetting, onRunningChan
 
             if (chart.on) {
                 drawNoteHighway(
-                    cues = highwayCues,
                     targets = highwayTargets,
                     beatPosition = beatPosition,
                     lookaheadBeats = 2.5,
@@ -225,73 +218,28 @@ fun SnapCrabsScreen(calibration: Calibration, chart: ChartSetting, onRunningChan
             )
         }
 
-        StageHeader("Snap Crabs", Color(0xFF2FBF9E), chart) {
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                LegendDot(Color(0xFFDE4636), "Call")
-                LegendDot(Color(0xFF6FB6FF), "Your tap")
-            }
-        }
-
-        Column(
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = statusBottomPadding),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            when {
-                finished -> {
-                    val rank = when (tally.rank) {
-                        Rank.SUPERB -> "Superb!"
-                        Rank.OK -> "OK"
-                        Rank.TRY_AGAIN -> "Try again"
-                    }
-                    HudChip {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            HudText(rank, loud = true)
-                            Spacer(Modifier.height(2.dp))
-                            HudText(tallyLine(tally), color = Color(0xFFAAB8B5))
-                            HudText("Tap to try again", color = Color(0xFFAAB8B5))
-                        }
-                    }
-                }
-                !started -> WatchAutoHide("idle") {
-                    HudChip {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            HudText("Tap to start", loud = true)
-                            Spacer(Modifier.height(2.dp))
-                            HudText(
-                                if (watch) {
-                                    "Repeat the lead crab"
-                                } else {
-                                    "Watch the lead crab snap a pattern, then repeat it one bar later " +
-                                        "(~${runLengthSeconds}s)"
-                                },
-                                color = Color(0xFFAAB8B5),
-                            )
-                            // The watch menu shows the offset under Calibrate instead.
-                            if (!watch) {
-                                HudText(calibration.statusLine(), color = Color(0xFFAAB8B5))
-                            }
-                        }
-                    }
-                }
-                else -> WatchAutoHide("run") {
-                    HudChip {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            HudText(sectionLabel(beatPosition), loud = true)
-                            Spacer(Modifier.height(2.dp))
-                            HudText(tallyLine(tally), color = Color(0xFFAAB8B5))
-                        }
-                    }
-                }
-            }
-        }
+        StageResults(
+            visible = finished,
+            accent = Color(0xFF2FBF9E),
+            sound = if (tally.rank == Rank.TRY_AGAIN) SoundId.BOO else SoundId.CHEER,
+            audioEngine = audioEngine,
+            audioClock = audioClock,
+            headline = when (tally.rank) {
+                Rank.SUPERB -> "Superb!"
+                Rank.OK -> "OK"
+                Rank.TRY_AGAIN -> "Try again"
+            },
+            heroValue = (tally.score * 100).roundToInt(),
+            heroFormat = { "$it%" },
+            stats = listOf(
+                StatCounter("Perfect", tally.perfect),
+                StatCounter("OK", tally.ok),
+                StatCounter("Miss", tally.miss),
+            ),
+            onRestart = ::restart,
+            onMenu = onMenu,
+        )
     }
-}
-
-private fun sectionLabel(beat: Double): String = when {
-    beat < SnapCrabsSong.VERSE -> "Get ready…"
-    beat >= SnapCrabsSong.OUTRO -> "Nice snapping!"
-    (beat - SnapCrabsSong.VERSE) % CYCLE_BEATS < CALL_BAR_BEATS -> "Watch the lead crab"
-    else -> "Your turn — repeat it"
 }
 
 /**
@@ -352,19 +300,6 @@ private fun DrawScope.drawBeachBackground(w: Float, h: Float, beatPosition: Doub
         val fx = (i * 53 % 977) / 977f
         val fy = (i * 131 % 613) / 613f
         drawRect(Color(0xFFE3BC80), topLeft = Offset(fx * w, sandTop + fy * sandHeight), size = Size(3f, 2f))
-    }
-}
-
-@Composable
-internal fun LegendDot(color: Color, label: String, shape: NoteShape = NoteShape.DOT) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        when (shape) {
-            NoteShape.DOT -> Box(modifier = Modifier.size(8.dp).background(color, CircleShape))
-            // Drawn with the highway's own marker, so the legend matches what scrolls past.
-            NoteShape.SWIPE -> Canvas(Modifier.size(14.dp)) { drawSwipeMarker(center, size.minDimension * 0.4f, color) }
-        }
-        Spacer(Modifier.width(6.dp))
-        HudText(label, color = Color(0xFFAAB8B5))
     }
 }
 

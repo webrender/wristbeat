@@ -24,8 +24,10 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.takeOrElse
 import org.jetbrains.compose.resources.Font
 import wristbeat.app.generated.resources.Res
 import wristbeat.app.generated.resources.sniglet_extrabold
@@ -54,7 +56,8 @@ fun wristbeatFontFamily(): FontFamily = FontFamily(
 /**
  * Bold, shadowed, letter-spaced, all-caps HUD text reading as game overlay copy rather than
  * default Material body text. [loud] is for headline-weight lines (titles, ranks); the default
- * weight is for secondary status/stat readouts.
+ * weight is for secondary status/stat readouts. [fontSize] overrides the default HUD sizing for a
+ * one-off need (e.g. the results screen's huge hero number); leave it unspecified everywhere else.
  */
 @Composable
 fun HudText(
@@ -62,14 +65,17 @@ fun HudText(
     modifier: Modifier = Modifier,
     color: Color = Color.White,
     loud: Boolean = false,
+    fontSize: TextUnit = TextUnit.Unspecified,
 ) {
     Text(
         text = text.uppercase(),
         modifier = modifier,
         color = color,
         fontFamily = hudFontFamily(loud),
-        // Watch faces are ~200dp across, so HUD copy shrinks there to fit a line or two.
-        fontSize = if (LocalHudLayout.current.watch) (if (loud) 13.sp else 9.sp) else (if (loud) 24.sp else 14.sp),
+        fontSize = fontSize.takeOrElse {
+            // Watch faces are ~200dp across, so HUD copy shrinks there to fit a line or two.
+            if (LocalHudLayout.current.watch) (if (loud) 13.sp else 9.sp) else (if (loud) 24.sp else 14.sp)
+        },
         letterSpacing = if (loud) 0.3.sp else 0.4.sp,
         textAlign = TextAlign.Center,
         style = TextStyle(

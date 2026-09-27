@@ -30,6 +30,8 @@ enum class SoundId {
     THUD,
     CRASH,
     TOM,
+    CHEER,
+    BOO,
 }
 
 /** [param] carries a sound-specific extra value (a MIDI note for BASS_*, MEL, STEEL_PAN, KEYS and TOM); other sounds leave it 0. */

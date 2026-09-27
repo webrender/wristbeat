@@ -81,6 +81,24 @@ actual class AudioEngine actual constructor() {
                 osc(Wave.SINE, freq, t, 0.004, 0.55, 0.2, endFreq = freq * 0.6)
                 noise(t, 0.03, 0.1, FilterType.BANDPASS, 1200.0, 1.0)
             }
+            // Same voicings as AudioEngine.wasmJs.kt's CHEER/BOO.
+            SoundId.CHEER -> {
+                noise(t, 0.6, 0.18, FilterType.BANDPASS, 2200.0, 0.6)
+                for ((i, note) in listOf(60.0, 64.0, 67.0, 72.0, 76.0).withIndex()) {
+                    val tt = t + i * 0.07
+                    val freq = mtof(note)
+                    osc(Wave.TRIANGLE, freq, tt, 0.006, 0.16, 0.22)
+                    osc(Wave.SQUARE, freq, tt, 0.006, 0.05, 0.12)
+                }
+            }
+            SoundId.BOO -> {
+                noise(t, 0.9, 0.14, FilterType.LOWPASS, 700.0, 0.8)
+                for ((i, note) in listOf(67.0, 65.0, 64.0, 60.0).withIndex()) {
+                    val tt = t + i * 0.22
+                    val freq = mtof(note)
+                    osc(Wave.SAWTOOTH, freq, tt, 0.02, 0.22, 0.24, endFreq = freq * 0.94)
+                }
+            }
         }
     }
 }

@@ -24,12 +24,11 @@ internal data class HighwayNote(
 private const val NOTE_SIZE_BOOST = 1.6f
 
 /**
- * A note highway: cues (top row) and player targets (bottom row) slide in from the right and
- * arrive at the hit line exactly on their beat, so exactly when an input is expected is visible
- * ahead of time, not just reacted to after the fact. Shared by every stage with a chart toggle.
+ * A note highway: player targets slide in from the right and arrive at the hit line exactly on
+ * their beat, so exactly when an input is expected is visible ahead of time, not just reacted to
+ * after the fact. Shared by every stage with a chart toggle.
  */
 internal fun DrawScope.drawNoteHighway(
-    cues: List<HighwayNote>,
     targets: List<HighwayNote>,
     beatPosition: Double,
     lookaheadBeats: Double,
@@ -38,15 +37,13 @@ internal fun DrawScope.drawNoteHighway(
     laneLeftX: Float,
     laneRightX: Float,
 ) {
-    val rowGap = size.height * 0.045f
-    // The lanes span 72% of the 400-unit logical stage (0.20–0.92), so this maps note radii from
+    // The lane spans 72% of the 400-unit logical stage (0.20–0.92), so this maps note radii from
     // logical units to pixels; [NOTE_SIZE_BOOST] enlarges them past the prototype's sizes, which
     // read as specks on a real screen.
     val noteScale = (laneRightX - laneLeftX) / (400f * 0.72f) * NOTE_SIZE_BOOST
-    val cueRowY = laneY - rowGap
-    val targetRowY = laneY + rowGap
+    val rowHeight = size.height * 0.045f
 
-    // A HUD ribbon behind just the highway (not the whole stage) keeps the lanes legible over the
+    // A HUD ribbon behind just the highway (not the whole stage) keeps the lane legible over the
     // scenery without covering it in a web-card rectangle.
     val padding = (laneRightX - laneLeftX) * 0.05f
     drawRect(
@@ -60,35 +57,30 @@ internal fun DrawScope.drawNoteHighway(
             startX = laneLeftX - padding,
             endX = laneRightX + padding,
         ),
-        topLeft = Offset(laneLeftX - padding, cueRowY - rowGap * 1.3f),
-        size = Size((laneRightX - laneLeftX) + padding * 2f, rowGap * 2.6f),
+        topLeft = Offset(laneLeftX - padding, laneY - rowHeight),
+        size = Size((laneRightX - laneLeftX) + padding * 2f, rowHeight * 2f),
     )
 
-    drawLine(Color.White.copy(alpha = 0.08f), Offset(laneLeftX, cueRowY), Offset(laneRightX, cueRowY), strokeWidth = 2f)
-    drawLine(Color.White.copy(alpha = 0.12f), Offset(laneLeftX, targetRowY), Offset(laneRightX, targetRowY), strokeWidth = 2f)
+    drawLine(Color.White.copy(alpha = 0.12f), Offset(laneLeftX, laneY), Offset(laneRightX, laneY), strokeWidth = 2f)
 
-    // Hit line: spans both rows, flashes on every beat and flares brighter exactly when a
-    // target arrives, so it doubles as both a metronome and the "act now" cue.
+    // Hit line: flashes on every beat and flares brighter exactly when a target arrives, so it
+    // doubles as both a metronome and the "act now" cue.
     drawLine(
         Color(0xFFFFE29A).copy(alpha = 0.35f + 0.65f * hitFlash),
-        Offset(laneLeftX, cueRowY - 14f * noteScale),
-        Offset(laneLeftX, targetRowY + 14f * noteScale),
+        Offset(laneLeftX, laneY - 14f * noteScale),
+        Offset(laneLeftX, laneY + 14f * noteScale),
         strokeWidth = 3f + 6f * hitFlash,
     )
 
-    fun drawRow(notes: List<HighwayNote>, y: Float) {
-        for (note in notes) {
-            val until = note.beat - beatPosition
-            if (until < -0.05 || until > lookaheadBeats) continue
-            val x = laneLeftX + (until / lookaheadBeats).toFloat() * (laneRightX - laneLeftX)
-            when (note.shape) {
-                NoteShape.DOT -> drawCircle(note.color, radius = note.radius * noteScale, center = Offset(x, y))
-                NoteShape.SWIPE -> drawSwipeMarker(Offset(x, y), note.radius * noteScale, note.color)
-            }
+    for (note in targets) {
+        val until = note.beat - beatPosition
+        if (until < -0.05 || until > lookaheadBeats) continue
+        val x = laneLeftX + (until / lookaheadBeats).toFloat() * (laneRightX - laneLeftX)
+        when (note.shape) {
+            NoteShape.DOT -> drawCircle(note.color, radius = note.radius * noteScale, center = Offset(x, laneY))
+            NoteShape.SWIPE -> drawSwipeMarker(Offset(x, laneY), note.radius * noteScale, note.color)
         }
     }
-    drawRow(cues, cueRowY)
-    drawRow(targets, targetRowY)
 }
 
 /**
