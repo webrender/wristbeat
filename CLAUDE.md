@@ -142,7 +142,7 @@ into the same timebase before judging, per HANDOFF's timing-accuracy requirement
   `origin/main`.
 - Web: `.github/workflows/pages.yml` builds the production web bundle
   (`./gradlew :composeApp:wasmJsBrowserDistribution` → `composeApp/build/dist/wasmJs/productionExecutable`)
-  on every push to `main` and deploys it to GitHub Pages at `https://webrender.github.io/wristbeat/`
+  on every push to `main` and deploys it to GitHub Pages at `https://webrender.net/wristbeat/` (the account's Pages custom domain)
   (needs the repo's Settings → Pages source set to "GitHub Actions").
 - Dev server: `./gradlew :composeApp:wasmJsBrowserDevelopmentRun` → serves at `http://localhost:8080`
 
