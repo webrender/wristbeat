@@ -140,6 +140,10 @@ into the same timebase before judging, per HANDOFF's timing-accuracy requirement
   run number. CI signs with the `DEBUG_KEYSTORE_BASE64` repo secret when set so releases install
   over each other; without it each build gets a throwaway key. Local branch is `master`, tracking
   `origin/main`.
+- Web: `.github/workflows/pages.yml` builds the production web bundle
+  (`./gradlew :composeApp:wasmJsBrowserDistribution` → `composeApp/build/dist/wasmJs/productionExecutable`)
+  on every push to `main` and deploys it to GitHub Pages at `https://webrender.github.io/wristbeat/`
+  (needs the repo's Settings → Pages source set to "GitHub Actions").
 - Dev server: `./gradlew :composeApp:wasmJsBrowserDevelopmentRun` → serves at `http://localhost:8080`
 
 **The dev server does not hot-reload.** It's a `webpack-dev-server` in front of a compiled Wasm
