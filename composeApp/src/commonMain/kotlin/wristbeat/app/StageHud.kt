@@ -1,6 +1,7 @@
 package wristbeat.app
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
@@ -20,6 +21,12 @@ import androidx.compose.ui.unit.dp
 internal data class HudLayout(val watch: Boolean = false)
 
 internal val LocalHudLayout = compositionLocalOf { HudLayout() }
+
+/** Lays out [content] (HUD text, [GameButton]s) at watch size, for `wearApp`'s own screens. */
+@Composable
+fun ProvideWatchHud(content: @Composable () -> Unit) {
+    CompositionLocalProvider(LocalHudLayout provides HudLayout(watch = true), content = content)
+}
 
 /** The app-wide note highway ("chart") setting, shown as a toggle in the main menu. */
 data class ChartSetting(val on: Boolean, val onToggle: () -> Unit)
@@ -43,7 +50,7 @@ internal fun ReportRunning(running: Boolean, onRunningChanged: (Boolean) -> Unit
 
 /** Lets a player hide the note highway (the "visual beat indicator chart") and play by ear alone. */
 @Composable
-internal fun ChartToggle(chart: ChartSetting, modifier: Modifier = Modifier, fontSize: TextUnit = TextUnit.Unspecified) {
+fun ChartToggle(chart: ChartSetting, modifier: Modifier = Modifier, fontSize: TextUnit = TextUnit.Unspecified) {
     GameButton(
         modifier = modifier,
         accent = if (chart.on) Color(0xFF2FBF9E) else Color(0xFF16302D),

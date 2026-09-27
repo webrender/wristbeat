@@ -29,7 +29,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -47,10 +47,11 @@ import wristbeat.core.SECONDS_PER_BEAT
 
 /**
  * The app's home screen on phone/web: picks a stage and toggles the note highway, so no stage
- * screen needs its own title, tabs or chart button while it's being played. Mirrors the native
- * menu `wearApp` already has on the watch. Everything here scales off the screen's smaller
- * dimension (see [StageResults], which uses the same trick), so the menu fills most of a big
- * desktop window instead of sitting small in the middle of it.
+ * screen needs its own title, tabs or chart button while it's being played. `wearApp`'s watch menu
+ * is built from the same pieces ([MenuBackdrop], [MenuTitle], [StageMenuEntry], [ChartToggle]) in a
+ * round-screen scrolling list. Everything here scales off the screen's smaller dimension (see
+ * [StageResults], which uses the same trick), so the menu fills most of a big desktop window
+ * instead of sitting small in the middle of it.
  */
 @Composable
 fun MainMenu(calibration: Calibration, chart: ChartSetting, onSelect: (Stage) -> Unit) {
@@ -64,38 +65,9 @@ fun MainMenu(calibration: Calibration, chart: ChartSetting, onSelect: (Stage) ->
         val entryPadding = (minDim * 0.011f).dp
         val emblemSize = (minDim * 0.112f).dp
         val menuWidth = (minOf(maxWidth, maxHeight) * 1.35f).coerceAtMost(maxWidth * 0.92f)
+        val beat = rememberMenuBeat()
 
-        Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0A1614)))
-
-        val infinite = rememberInfiniteTransition(label = "menu-bg")
-        // A full breath (swell then relax) every two beats of the shared tempo, so the backdrop
-        // feels alive to the game's own rhythm rather than an arbitrary decorative pulse.
-        val beatPulse by infinite.animateFloat(
-            initialValue = 0f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(
-                tween((SECONDS_PER_BEAT * 1000).toInt(), easing = LinearEasing),
-                repeatMode = RepeatMode.Reverse,
-            ),
-            label = "beat-pulse",
-        )
-        val drift by infinite.animateFloat(
-            initialValue = 0f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(tween(16000, easing = LinearEasing)),
-            label = "particle-drift",
-        )
-
-        // A free-running beat count at the shared tempo, for the title's bounce and the emblems.
-        val beatCount by infinite.animateFloat(
-            initialValue = 0f,
-            targetValue = 64f,
-            animationSpec = infiniteRepeatable(tween((SECONDS_PER_BEAT * 64 * 1000).toInt(), easing = LinearEasing)),
-            label = "menu-beat",
-        )
-        val beat = beatCount.toDouble()
-
-        Canvas(modifier = Modifier.fillMaxSize()) { drawMenuBackdrop(beatPulse, drift) }
+        MenuBackdrop()
 
         Column(
             modifier = Modifier
@@ -108,27 +80,20 @@ fun MainMenu(calibration: Calibration, chart: ChartSetting, onSelect: (Stage) ->
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(entryPadding),
         ) {
-            BouncingTitle("Wristbeat", titleSize, beat)
+            MenuTitle(titleSize, beat)
             Spacer(Modifier.height(entryPadding))
             for (stage in Stage.entries) {
-                MenuEntry(
-                    label = stage.label,
-                    subtitle = menuSubtitle(stage, calibration),
-                    accent = stage.accent,
-                    enabled = stage.enabled,
+                StageMenuEntry(
+                    stage = stage,
+                    // Only Calibrate has a subtitle (its saved offset); the stages speak for
+                    // themselves through their emblems.
+                    subtitle = if (stage == Stage.CALIBRATE) calibration.statusLine() else null,
+                    beat = beat,
                     labelSize = entryLabelSize,
                     subtitleSize = entrySubtitleSize,
                     padding = entryPadding,
                     emblemSize = emblemSize,
-                    emblem = {
-                        when (stage) {
-                            Stage.CALIBRATE -> drawCalibrateEmblem(beat)
-                            Stage.SNAP_CRABS -> drawSnapCrabsEmblem(beat)
-                            Stage.MANGO_CHOP -> drawMangoChopEmblem(beat)
-                            Stage.BONGO_BLITZ -> drawBongoBlitzEmblem(beat)
-                            Stage.REMIX_1 -> drawRemix1Emblem(beat)
-                        }
-                    },
+                    modifier = Modifier.fillMaxWidth(),
                     onClick = { onSelect(stage) },
                 )
             }
@@ -138,35 +103,85 @@ fun MainMenu(calibration: Calibration, chart: ChartSetting, onSelect: (Stage) ->
     }
 }
 
-/** Only Calibrate has a subtitle (its saved offset); the stages speak for themselves through their emblems. */
-private fun menuSubtitle(stage: Stage, calibration: Calibration): String? =
-    if (stage == Stage.CALIBRATE) calibration.statusLine() else null
-
+/**
+ * A free-running beat count at the shared tempo, for the title's bounce and the emblems. It's a
+ * lambda so callers read it only while drawing, and the menu redraws each frame without
+ * recomposing.
+ */
 @Composable
-private fun MenuEntry(
-    label: String,
+fun rememberMenuBeat(): () -> Double {
+    val infinite = rememberInfiniteTransition(label = "menu-beat")
+    val beatCount = infinite.animateFloat(
+        initialValue = 0f,
+        targetValue = 64f,
+        animationSpec = infiniteRepeatable(tween((SECONDS_PER_BEAT * 64 * 1000).toInt(), easing = LinearEasing)),
+        label = "menu-beat",
+    )
+    return remember(beatCount) { { beatCount.value.toDouble() } }
+}
+
+/** The menu's full-screen animated backdrop (see [drawMenuBackdrop]). */
+@Composable
+fun MenuBackdrop(modifier: Modifier = Modifier) {
+    val infinite = rememberInfiniteTransition(label = "menu-bg")
+    // A full breath (swell then relax) every two beats of the shared tempo, so the backdrop
+    // feels alive to the game's own rhythm rather than an arbitrary decorative pulse.
+    val beatPulse = infinite.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            tween((SECONDS_PER_BEAT * 1000).toInt(), easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "beat-pulse",
+    )
+    val drift = infinite.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(16000, easing = LinearEasing)),
+        label = "particle-drift",
+    )
+    Canvas(modifier = modifier.fillMaxSize().background(Color(0xFF0A1614))) {
+        drawMenuBackdrop(beatPulse.value, drift.value)
+    }
+}
+
+/**
+ * One stage's menu button: its animated emblem on the left, balanced by an equal gap on the right
+ * so the outlined label stays centred, with an optional [subtitle] underneath.
+ */
+@Composable
+fun StageMenuEntry(
+    stage: Stage,
     subtitle: String?,
-    accent: Color,
-    enabled: Boolean,
+    beat: () -> Double,
     labelSize: TextUnit,
     subtitleSize: TextUnit,
     padding: Dp,
     emblemSize: Dp,
-    emblem: DrawScope.() -> Unit,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
-    GameButton(modifier = Modifier.fillMaxWidth(), accent = accent, enabled = enabled, onClick = onClick) {
-        // The stage's emblem on the left, balanced by an equal gap on the right so the text stays centred.
+    val accent = stage.accent
+    GameButton(modifier = modifier, accent = accent, enabled = stage.enabled, onClick = onClick) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Canvas(modifier = Modifier.size(emblemSize), onDraw = emblem)
+            Canvas(modifier = Modifier.size(emblemSize)) {
+                when (stage) {
+                    Stage.CALIBRATE -> drawCalibrateEmblem(beat())
+                    Stage.SNAP_CRABS -> drawSnapCrabsEmblem(beat())
+                    Stage.MANGO_CHOP -> drawMangoChopEmblem(beat())
+                    Stage.BONGO_BLITZ -> drawBongoBlitzEmblem(beat())
+                    Stage.REMIX_1 -> drawRemix1Emblem(beat())
+                }
+            }
             Column(
                 modifier = Modifier.weight(1f).padding(vertical = padding),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 // Near-white with a faint tint of the button's accent, outlined in a deep shade of it,
-                // like the title above.
+                // like the title.
                 OutlinedHudText(
-                    label,
+                    stage.label,
                     fontSize = labelSize,
                     color = lerp(Color.White, accent, 0.18f),
                     outline = lerp(accent, Color.Black, 0.62f),
@@ -183,18 +198,20 @@ private fun MenuEntry(
  * another in a wave that travels across the word once per beat.
  */
 @Composable
-private fun BouncingTitle(text: String, fontSize: TextUnit, beat: Double) {
+fun MenuTitle(fontSize: TextUnit, beat: () -> Double, text: String = "Wristbeat") {
     val colors = Stage.entries.map { lerp(it.accent, Color.White, 0.25f) }
     val hop = with(LocalDensity.current) { fontSize.toPx() } * 0.12f
     Row {
         for ((i, letter) in text.withIndex()) {
-            val phase = ((beat - i * 0.09) % 1.0 + 1.0) % 1.0
-            val lift = if (phase < 0.35) sin(phase / 0.35 * PI).toFloat() else 0f
             OutlinedHudText(
                 letter.toString(),
                 fontSize = fontSize,
                 color = colors[i % colors.size],
-                modifier = Modifier.graphicsLayer { translationY = -lift * hop },
+                modifier = Modifier.graphicsLayer {
+                    val phase = ((beat() - i * 0.09) % 1.0 + 1.0) % 1.0
+                    val lift = if (phase < 0.35) sin(phase / 0.35 * PI).toFloat() else 0f
+                    translationY = -lift * hop
+                },
             )
         }
     }

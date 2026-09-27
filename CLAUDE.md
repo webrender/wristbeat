@@ -154,12 +154,17 @@ into the same timebase before judging, per HANDOFF's timing-accuracy requirement
   `tally.rank`: a cheer (`SoundId.CHEER`) for a pass (OK or Superb), a sad-trombone boo
   (`SoundId.BOO`) for `Rank.TRY_AGAIN`. Calibrate reuses the same `StageResults` shell for its
   offset readout (counting up to the measured `ms`), but plays no sound — it isn't scored pass/fail.
-  `onMenu` is only wired up on phone/web (`App.kt`); the watch leaves it null and relies on
-  swipe-to-dismiss instead, so its results screen shows only "Try again".
+  "Menu" (`onMenu`) is wired up everywhere: `App.kt` on phone/web, `WatchStageScreen` on the watch
+  (where "Try again" reads "Retry", so both fit where the round face narrows). The results screen
+  soaks up touches that miss its buttons, so they don't fall through to the stage and restart the
+  run — which also used to block the watch's swipe-to-dismiss from the results screen.
 - **Input** — pointer/touch taps everywhere, plus Space/J/F/Enter on the keyboard
   (`InputHandling.kt`'s `rememberTapKeyModifier`), matching HANDOFF's documented web input mapping.
-  Taps are judged when the finger **lands** (`detectTapGestures(onPress = …)`), not on release, so
-  Calibrate's offset doesn't include how long a tap is held and applies to every stage.
+  Taps are judged when the finger **lands** (`awaitFirstDown`), not on release, so Calibrate's
+  offset doesn't include how long a tap is held and applies to every stage — and at the event's own
+  timestamp (`AudioClock.timeAtInputEvent`), not when the handler runs, so phones' frame-batched
+  touch delivery doesn't add random lateness. On web, Compose 1.7 stamps events at handling time,
+  so `AudioClock.wasmJs.kt` records the DOM `event.timeStamp` with a capture listener instead.
   Mango Chop's swipe: on touch (and mouse drag) a swipe fires when the pointer moves 24dp. To avoid
   delaying chops, a press chops immediately when the nearest open fruit wants a chop. When a
   pineapple is nearest, the press waits: it slices if it becomes a swipe, and otherwise chops on
@@ -211,14 +216,17 @@ into the same timebase before judging, per HANDOFF's timing-accuracy requirement
     shape or plain `Modifier.background()` chip — those read as web chips, not game UI, which is
     exactly what this replaced.
 
-- **Watch UI** (`wearApp/.../WearApp.kt`) — a round watch face can't fit the phone/web `MainMenu`
-  either, so the watch has its own shell built on Wear Compose Material 1.4 (matches Compose 1.7;
-  Wear Material 3 would need a newer Compose). A native menu (`ScalingLazyColumn` of `Chip`s,
-  `TimeText`, and a `ToggleChip` for the chart) picks a stage, with the saved calibration offset
-  for the current output under Calibrate. Each stage opens full screen via `SwipeDismissableNavHost`; swiping right returns to the
-  menu, except mid-run (swipe-to-dismiss is disabled while a run is in progress, since a sloppy tap
-  or a Mango Chop slice would otherwise quit) — there's no "Menu" button like phone/web, since the
-  swipe already does that job. The screen stays on during a run. Stages render through `App.kt`'s
+- **Watch UI** (`wearApp/.../WearApp.kt`) — the watch has its own shell built on Wear Compose
+  Material 1.4 (matches Compose 1.7; Wear Material 3 would need a newer Compose), but its menu
+  looks like the phone/web one: it's built from `MainMenu.kt`'s own pieces (`MenuBackdrop`,
+  `MenuTitle`, `StageMenuEntry`, `ChartToggle`, sized for the watch under `ProvideWatchHud`) laid
+  out in a Wear `ScalingLazyColumn`, so it curves with the round face and scrolls with the crown.
+  Only `TimeText` (which scrolls away) and the scroll indicator are Wear Material. Calibrate's
+  subtitle is a shortened offset ("Offset +12ms"). Each stage opens full screen via
+  `SwipeDismissableNavHost`; swiping right returns to the menu, except mid-run (swipe-to-dismiss is
+  disabled while a run is in progress, since a sloppy tap or a Mango Chop slice would otherwise
+  quit), and the results screen's "Menu" button does the same. The screen stays on during a run.
+  Stages render through `App.kt`'s
   `WatchStageScreen`, which sets `HudLayout(watch = true)`: HUD text and chips shrink, and status
   panels drop to the lines that fit on a round face (`statusBottomPadding`; `StageResults`'s own
   hero/headline sizes also shrink for the watch). There are

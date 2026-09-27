@@ -1,6 +1,10 @@
 package wristbeat.wear
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -10,41 +14,44 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
-import androidx.wear.compose.material.Chip
-import androidx.wear.compose.material.ChipDefaults
 import androidx.wear.compose.material.Colors
-import androidx.wear.compose.material.ListHeader
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.PositionIndicator
 import androidx.wear.compose.material.Scaffold
-import androidx.wear.compose.material.Switch
-import androidx.wear.compose.material.Text
 import androidx.wear.compose.material.TimeText
-import androidx.wear.compose.material.ToggleChip
+import androidx.wear.compose.material.scrollAway
 import androidx.wear.compose.material.Typography
 import androidx.wear.compose.navigation.SwipeDismissableNavHost
 import androidx.wear.compose.navigation.composable
 import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import wristbeat.app.Calibration
 import wristbeat.app.ChartSetting
+import wristbeat.app.ChartToggle
+import wristbeat.app.MenuBackdrop
+import wristbeat.app.MenuTitle
+import wristbeat.app.ProvideWatchHud
 import wristbeat.app.Stage
+import wristbeat.app.StageMenuEntry
 import wristbeat.app.WatchStageScreen
-import wristbeat.app.accent
 import wristbeat.app.rememberCalibration
+import wristbeat.app.rememberMenuBeat
 import wristbeat.app.wristbeatFontFamily
 
 private const val MENU_ROUTE = "menu"
 
-private val Teal = Color(0xFF2FBF9E)
-
 /**
- * The watch's own shell around the shared stages: a native Wear menu (a scrolling list of chips)
- * picks a stage and toggles the chart, and each stage opens full screen. Swiping right goes back
- * to the menu, except mid-run, where a swipe is far more likely to be a sloppy tap or a Mango Chop
- * slice than a request to quit; the screen also stays on while a run is in progress.
+ * The watch's own shell around the shared stages: a menu picks a stage and toggles the chart, and
+ * each stage opens full screen. The menu is the phone/web `MainMenu`'s look (its backdrop, bouncing
+ * title, emblem buttons and chart toggle) in a Wear scrolling list, so it curves with the round
+ * face and scrolls with the crown. Swiping right goes back to the menu, except mid-run, where a
+ * swipe is far more likely to be a sloppy tap or a Mango Chop slice than a request to quit; the
+ * results screen also has a "Menu" button. The screen stays on while a run is in progress.
  */
 @Composable
 fun WearApp() {
@@ -69,9 +76,8 @@ fun WearApp() {
         ) {
             composable(MENU_ROUTE) {
                 StageMenu(
-                    offsetLabel = calibration.offsetMs?.let { "Offset ${formatOffset(it)}" } ?: "Start here",
-                    chartOn = showChart,
-                    onChartChange = { showChart = it },
+                    calibration = calibration,
+                    chart = chart,
                     onSelect = { navController.navigate(it.name) },
                 )
             }
@@ -82,6 +88,7 @@ fun WearApp() {
                         calibration = calibration,
                         chart = chart,
                         onRunningChanged = { running = it },
+                        onMenu = { navController.popBackStack(MENU_ROUTE, inclusive = false) },
                     )
                 }
             }
@@ -90,61 +97,56 @@ fun WearApp() {
 }
 
 @Composable
-private fun StageMenu(
-    offsetLabel: String,
-    chartOn: Boolean,
-    onChartChange: (Boolean) -> Unit,
-    onSelect: (Stage) -> Unit,
-) {
+private fun StageMenu(calibration: Calibration, chart: ChartSetting, onSelect: (Stage) -> Unit) {
     val listState = rememberScalingLazyListState()
+    val beat = rememberMenuBeat()
     Scaffold(
-        timeText = { TimeText() },
+        // The clock slides away as the list scrolls, so it doesn't sit on top of the buttons.
+        timeText = { TimeText(modifier = Modifier.scrollAway(listState)) },
         positionIndicator = { PositionIndicator(scalingLazyListState = listState) },
     ) {
-        ScalingLazyColumn(state = listState, modifier = Modifier.fillMaxWidth()) {
-            item { ListHeader { Text("Wristbeat", color = Teal) } }
-            for (stage in Stage.entries) {
-                item {
-                    Chip(
-                        onClick = { onSelect(stage) },
-                        enabled = stage.enabled,
-                        label = { Text(stage.label) },
-                        secondaryLabel = {
-                            Text(
-                                when (stage) {
-                                    Stage.CALIBRATE -> offsetLabel
-                                    Stage.SNAP_CRABS -> "Repeat the lead crab"
-                                    Stage.MANGO_CHOP -> "Tap to chop, swipe to slice"
-                                    Stage.BONGO_BLITZ -> "Copy the monkey's beat"
-                                    Stage.REMIX_1 -> "All three, one new song"
+        Box(Modifier.fillMaxSize()) {
+            MenuBackdrop()
+            ProvideWatchHud {
+                ScalingLazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 24.dp),
+                ) {
+                    item { MenuTitle(fontSize = 22.sp, beat = beat) }
+                    for (stage in Stage.entries) {
+                        item {
+                            StageMenuEntry(
+                                stage = stage,
+                                // Like the phone/web menu, only Calibrate has a subtitle: its saved
+                                // offset, shortened to fit the watch.
+                                subtitle = if (stage == Stage.CALIBRATE) {
+                                    calibration.offsetMs?.let { "Offset ${formatOffset(it)}" } ?: "Not calibrated"
+                                } else {
+                                    null
                                 },
+                                beat = beat,
+                                labelSize = 12.sp,
+                                subtitleSize = 9.sp,
+                                padding = 3.dp,
+                                emblemSize = 26.dp,
+                                modifier = Modifier.fillMaxWidth(),
+                                onClick = { onSelect(stage) },
                             )
-                        },
-                        colors = ChipDefaults.primaryChipColors(
-                            backgroundColor = stage.accent,
-                            contentColor = Color(0xFF1A1206),
-                            secondaryContentColor = Color(0xFF1A1206).copy(alpha = 0.75f),
-                        ),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+                        }
+                    }
+                    item {
+                        ChartToggle(chart, modifier = Modifier.fillMaxWidth().padding(top = 4.dp), fontSize = 12.sp)
+                    }
                 }
-            }
-            item {
-                ToggleChip(
-                    checked = chartOn,
-                    onCheckedChange = onChartChange,
-                    label = { Text("Chart") },
-                    secondaryLabel = { Text(if (chartOn) "Notes on screen" else "Play by ear") },
-                    toggleControl = { Switch(checked = chartOn) },
-                    modifier = Modifier.fillMaxWidth(),
-                )
             }
         }
     }
 }
 
+// Only TimeText and the scroll indicator still use Wear Material; everything else is the app's own UI.
 private val WristbeatColors = Colors(
-    primary = Teal,
+    primary = Color(0xFF2FBF9E),
     primaryVariant = Color(0xFF1C9A6A),
     secondary = Color(0xFFFFB320),
     onPrimary = Color(0xFF06211D),

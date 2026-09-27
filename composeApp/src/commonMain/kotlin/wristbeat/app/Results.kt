@@ -33,6 +33,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -145,23 +148,30 @@ internal fun BoxScope.StageResults(
         else -> accent
     }
 
-    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+    // Soaks up touches that miss the buttons, so they can't fall through to the stage underneath and
+    // restart the run (which would also block the watch's swipe-to-dismiss mid-swipe). Only the
+    // down is consumed, so a swipe that starts here still reaches swipe-to-dismiss.
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(Unit) { awaitEachGesture { awaitFirstDown().consume() } },
+    ) {
         // Everything is sized off the screen's smaller dimension, so the whole scoreboard scales up
         // to fill most of a big desktop window instead of sitting tiny in the middle of it — a round
         // watch face is the one place that stays fixed-size, since its screen barely varies.
         val minDim = minOf(maxWidth, maxHeight).value
         val headlineSize = if (watch) 16.sp else (minDim * 0.09f).sp
-        val heroSize = if (watch) 34.sp else (minDim * 0.2f).sp
-        val statSize = if (watch) 14.sp else (minDim * 0.07f).sp
+        val heroSize = if (watch) 28.sp else (minDim * 0.2f).sp
+        val statSize = if (watch) 12.sp else (minDim * 0.07f).sp
         val statLabelSize = if (watch) 9.sp else (minDim * 0.03f).sp
         val recordSize = if (watch) 12.sp else (minDim * 0.05f).sp
-        val buttonTextSize = if (watch) 13.sp else (minDim * 0.045f).sp
+        val buttonTextSize = if (watch) 11.sp else (minDim * 0.045f).sp
         val buttonPadding = if (watch) 0.dp else (minDim * 0.02f).dp
         val gapTiny = if (watch) 2.dp else (minDim * 0.012f).dp
-        val gapSmall = if (watch) 6.dp else (minDim * 0.025f).dp
-        val gapMed = if (watch) 10.dp else (minDim * 0.04f).dp
+        val gapSmall = if (watch) 4.dp else (minDim * 0.025f).dp
+        val gapMed = if (watch) 6.dp else (minDim * 0.04f).dp
         val statGap = if (watch) 10.dp else (minDim * 0.05f).dp
-        val buttonGap = if (watch) 8.dp else (minDim * 0.03f).dp
+        val buttonGap = if (watch) 6.dp else (minDim * 0.03f).dp
 
         // Fully opaque backdrop: the results screen replaces the frozen game entirely, it doesn't
         // just dim it.
@@ -263,7 +273,8 @@ internal fun BoxScope.StageResults(
             ) {
                 GameButton(accent = accent, onClick = onRestart) {
                     Box(Modifier.padding(horizontal = buttonPadding, vertical = buttonPadding / 2)) {
-                        HudText("Try again", loud = true, fontSize = buttonTextSize)
+                        // Shorter on the watch, so both buttons fit where the round face narrows.
+                        HudText(if (watch) "Retry" else "Try again", loud = true, fontSize = buttonTextSize)
                     }
                 }
                 if (onMenu != null) {

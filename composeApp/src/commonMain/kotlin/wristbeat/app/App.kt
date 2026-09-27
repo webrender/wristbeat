@@ -111,10 +111,11 @@ fun App() {
 }
 
 /**
- * One stage on its own, laid out for a Wear OS watch: the watch's native menu (in `wearApp`)
- * handles stage switching, the chart toggle and the calibration readout, so there's no menu button
- * here, just the game. [onRunningChanged] reports whether a run is in progress, so the watch can
- * hold off swipe-to-dismiss and keep the screen on while playing.
+ * One stage on its own, laid out for a Wear OS watch: the watch's own menu (in `wearApp`) handles
+ * stage switching, the chart toggle and the calibration readout, so the game has no chrome while
+ * it's played. [onMenu] backs the results screen's "Menu" button, alongside swipe-to-dismiss.
+ * [onRunningChanged] reports whether a run is in progress, so the watch can hold off
+ * swipe-to-dismiss and keep the screen on while playing.
  */
 @Composable
 fun WatchStageScreen(
@@ -122,16 +123,17 @@ fun WatchStageScreen(
     calibration: Calibration,
     chart: ChartSetting,
     onRunningChanged: (Boolean) -> Unit,
+    onMenu: () -> Unit,
 ) {
     MaterialTheme {
         Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0F1B19))) {
-            CompositionLocalProvider(LocalHudLayout provides HudLayout(watch = true)) {
+            ProvideWatchHud {
                 when (stage) {
-                    Stage.CALIBRATE -> CalibrateScreen(calibration, onRunningChanged)
-                    Stage.SNAP_CRABS -> SnapCrabsScreen(calibration, chart, onRunningChanged)
-                    Stage.MANGO_CHOP -> MangoChopScreen(calibration, chart, onRunningChanged)
-                    Stage.BONGO_BLITZ -> BongoBlitzScreen(calibration, chart, onRunningChanged)
-                    Stage.REMIX_1 -> Remix1Screen(calibration, chart, onRunningChanged)
+                    Stage.CALIBRATE -> CalibrateScreen(calibration, onRunningChanged, onMenu)
+                    Stage.SNAP_CRABS -> SnapCrabsScreen(calibration, chart, onRunningChanged, onMenu)
+                    Stage.MANGO_CHOP -> MangoChopScreen(calibration, chart, onRunningChanged, onMenu)
+                    Stage.BONGO_BLITZ -> BongoBlitzScreen(calibration, chart, onRunningChanged, onMenu)
+                    Stage.REMIX_1 -> Remix1Screen(calibration, chart, onRunningChanged, onMenu)
                 }
             }
         }
