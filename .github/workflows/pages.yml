@@ -36,6 +36,12 @@ jobs:
       - name: Build web bundle
         run: ./gradlew :composeApp:wasmJsBrowserDistribution
 
+      # webrender.net sits behind Cloudflare, which caches .js for hours. composeApp.js has
+      # the same name every build (the .wasm files it loads are content-hashed), so a stale
+      # copy keeps loading the previous build. Version its URL per commit to bust the cache.
+      - name: Cache-bust composeApp.js
+        run: sed -i "s|src=\"composeApp.js\"|src=\"composeApp.js?v=${GITHUB_SHA::8}\"|" composeApp/build/dist/wasmJs/productionExecutable/index.html
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: composeApp/build/dist/wasmJs/productionExecutable
