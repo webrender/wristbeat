@@ -23,6 +23,16 @@ android {
             System.getenv("WRISTBEAT_DEBUG_KEYSTORE")?.let { storeFile = file(it) }
         }
     }
+    buildTypes {
+        // Non-debuggable and R8-optimized, which matters for Compose frame times. Signed with the
+        // debug key so it sideloads like the debug build; there's no store key yet.
+        getByName("release") {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+            signingConfig = signingConfigs.getByName("debug")
+        }
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
