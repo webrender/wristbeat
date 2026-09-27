@@ -32,20 +32,26 @@ data class TossResult(val grade: Grade?, val beat: Double) {
 data class ChopOutcome(val grade: Grade?, val errorMs: Double?, val tossIndex: Int?)
 
 /**
- * Mangoes (2 beats) and limes (1 beat) introduce the chop; pineapples arrive in the third section
- * and need a slice. The last two sections mix all three. Toss beats are in [MANGO_CHOP_BPM] beats.
+ * Mangoes (2 beats) and limes (1 beat) introduce the chop; pineapples arrive with the song's bridge
+ * and need a slice. The final chorus mixes all three. Each group starts on a section of
+ * [MangoChopSong], so new fruit comes in with new music. Toss beats are in [MANGO_CHOP_BPM] beats.
  */
 private val MANGO_CHOP_TOSSES: List<Toss> = listOf(
-    4.0 to Fruit.MANGO, 8.0 to Fruit.MANGO, 12.0 to Fruit.MANGO, 16.0 to Fruit.MANGO,
-    20.0 to Fruit.LIME, 22.0 to Fruit.LIME, 24.0 to Fruit.MANGO, 28.0 to Fruit.MANGO,
-    32.0 to Fruit.PINEAPPLE, 36.0 to Fruit.PINEAPPLE, 40.0 to Fruit.MANGO, 44.0 to Fruit.PINEAPPLE,
-    48.0 to Fruit.MANGO, 50.0 to Fruit.LIME, 52.0 to Fruit.PINEAPPLE, 54.0 to Fruit.LIME,
-    56.0 to Fruit.MANGO, 58.0 to Fruit.PINEAPPLE,
-    62.0 to Fruit.LIME, 63.0 to Fruit.LIME, 64.0 to Fruit.PINEAPPLE, 66.0 to Fruit.MANGO,
-    68.0 to Fruit.LIME, 69.0 to Fruit.PINEAPPLE, 72.0 to Fruit.MANGO,
+    // Verse
+    12.0 to Fruit.MANGO, 16.0 to Fruit.MANGO, 20.0 to Fruit.MANGO, 24.0 to Fruit.MANGO,
+    // Chorus
+    28.0 to Fruit.LIME, 30.0 to Fruit.LIME, 32.0 to Fruit.MANGO, 36.0 to Fruit.MANGO,
+    // Bridge
+    44.0 to Fruit.PINEAPPLE, 48.0 to Fruit.PINEAPPLE, 52.0 to Fruit.MANGO, 56.0 to Fruit.PINEAPPLE,
+    // Final chorus
+    60.0 to Fruit.MANGO, 62.0 to Fruit.LIME, 64.0 to Fruit.PINEAPPLE, 66.0 to Fruit.LIME,
+    68.0 to Fruit.MANGO, 70.0 to Fruit.PINEAPPLE,
+    74.0 to Fruit.LIME, 75.0 to Fruit.LIME, 76.0 to Fruit.PINEAPPLE, 78.0 to Fruit.MANGO,
+    80.0 to Fruit.LIME, 81.0 to Fruit.PINEAPPLE, 84.0 to Fruit.MANGO,
+    86.0 to Fruit.LIME, 87.0 to Fruit.LIME, 88.0 to Fruit.MANGO,
 ).map { (beat, fruit) -> Toss(beat, fruit) }
 
-const val MANGO_CHOP_END_BEATS = 76.0
+const val MANGO_CHOP_END_BEATS = MangoChopSong.END
 
 /**
  * Mango Chop: a whistle marks each toss, and the fruit lands [Fruit.airBeats] later. The player
@@ -65,7 +71,7 @@ class MangoChopStage(inputOffsetMs: Double = 0.0) {
     val end = MANGO_CHOP_END_BEATS
     val tosses: List<Toss> = MANGO_CHOP_TOSSES
     val chart: List<ChartEvent> =
-        (Charts.mangoChopBacking(end) + tosses.map { ChartEvent(it.beat, it.fruit.cue) }).sortedBy { it.beat }
+        (Charts.mangoChopBacking() + tosses.map { ChartEvent(it.beat, it.fruit.cue) }).sortedBy { it.beat }
 
     private val results = arrayOfNulls<TossResult>(tosses.size)
     private var perfect = 0

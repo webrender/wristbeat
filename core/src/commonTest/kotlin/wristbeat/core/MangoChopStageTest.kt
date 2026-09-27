@@ -87,7 +87,7 @@ class MangoChopStageTest {
     }
 
     @Test fun hasItsOwnSongRatherThanSnapCrabsBand() {
-        val mango = Charts.mangoChopBacking(MANGO_CHOP_END_BEATS)
+        val mango = Charts.mangoChopBacking()
         val uke = setOf(SoundId.UKE_F, SoundId.UKE_C, SoundId.UKE_BB)
         assertTrue(mango.none { it.sound in uke || it.sound == SoundId.MEL })
         assertTrue(mango.any { it.sound == SoundId.KEYS } && mango.any { it.sound == SoundId.SHAKER })
@@ -106,5 +106,20 @@ class MangoChopStageTest {
         val rawTap = stage.tosses[i].landBeat + 0.2 / stage.secondsPerBeat
         stage.recordAction(ChopAction.CHOP, rawTap)
         assertEquals(stage.tosses[i].landBeat, stage.resultOf(i)!!.beat, 1e-9)
+    }
+
+    @Test fun songHasAnIntroBeforeTheFirstTossAndAnOutroAfterTheLastLanding() {
+        val stage = MangoChopStage()
+        val backing = Charts.mangoChopBacking()
+        assertTrue(backing.any { it.beat < MangoChopSong.VERSE - 4 && it.sound == SoundId.STEEL_PAN })
+        assertEquals(MangoChopSong.VERSE, stage.tosses.first().beat)
+        assertTrue(stage.tosses.last().landBeat < MangoChopSong.OUTRO)
+        assertTrue(backing.any { it.beat == MangoChopSong.OUTRO && it.sound == SoundId.CRASH })
+        assertTrue(backing.all { it.beat < stage.end })
+    }
+
+    @Test fun pineapplesArriveWithTheBridge() {
+        val firstPineapple = MangoChopStage().tosses.first { it.fruit == Fruit.PINEAPPLE }
+        assertEquals(MangoChopSong.BRIDGE, firstPineapple.beat)
     }
 }

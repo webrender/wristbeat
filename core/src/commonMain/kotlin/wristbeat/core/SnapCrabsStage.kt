@@ -2,7 +2,10 @@ package wristbeat.core
 
 import kotlin.math.abs
 
-/** The lead crab's call-and-response patterns, in order, matching the prototype's GAMES.crabs.build(). */
+/**
+ * The lead crab's call-and-response patterns, in order, matching the prototype's GAMES.crabs.build().
+ * The first four (the easy ones) fall in the song's verse and the rest in its chorus.
+ */
 private val SNAP_PATTERNS: List<List<Double>> = listOf(
     listOf(0.0, 1.0, 2.0), // a
     listOf(0.0, 1.0, 2.0), // a
@@ -14,7 +17,7 @@ private val SNAP_PATTERNS: List<List<Double>> = listOf(
     listOf(0.0, 0.5, 1.0, 1.5, 2.0), // d
 )
 
-const val SNAP_CRABS_END_BEATS = 68.0
+const val SNAP_CRABS_END_BEATS = SnapCrabsSong.END
 
 data class TapOutcome(val grade: Grade?, val errorMs: Double)
 
@@ -39,9 +42,9 @@ class SnapCrabsStage(inputOffsetMs: Double = 0.0) {
     init {
         val lead = mutableListOf<Double>()
         val targ = mutableListOf<Double>()
-        val events = Charts.snapCrabsBacking(end).toMutableList()
+        val events = Charts.snapCrabsBacking().toMutableList()
         for ((i, pattern) in SNAP_PATTERNS.withIndex()) {
-            val b = 4.0 + i * 8
+            val b = SnapCrabsSong.VERSE + i * 8
             for (o in pattern) {
                 lead += b + o
                 events += ChartEvent(b + o, SoundId.LEAD_SNAP)

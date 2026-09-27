@@ -25,7 +25,12 @@ build and launch the shared `App()`), but their platform actuals are placeholder
   - `Judgment.kt` — `Grade`, `ScoreTally`, `Rank` and the PERFECT/OK/miss math.
   - `Chart.kt` — `SoundId`, `ChartEvent`, and `Charts` (procedural chart generators:
     `snapCrabsBacking`, the prototype's ukulele band, and `mangoChopBacking`, Mango Chop's own soca
-    song in A minor with keyboard stabs, shaker and a steel pan tune).
+    song in A minor with keyboard stabs, shaker and a steel pan tune). Each song has a real form,
+    laid out in beats by `SnapCrabsSong`/`MangoChopSong`: a musical intro whose last bar is the
+    stick count-in, verse/chorus sections (plus a bridge with its own progression in Mango Chop)
+    marked by crashes and tom/rim fills, and an outro that lands on a final chord and rings out
+    before the results. Stages place their gameplay on those sections (Snap Crabs' easy patterns
+    in the verse, harder ones in the chorus; Mango Chop's pineapples arrive with the bridge).
   - `CalibrateStage.kt`, `SnapCrabsStage.kt`, `MangoChopStage.kt` — per-stage state machines
     (`recordTap`/`recordAction`, `updateMisses`, `tally`, and `perceivedBeat`, which the screens draw
     at so visuals follow the calibrated offset).

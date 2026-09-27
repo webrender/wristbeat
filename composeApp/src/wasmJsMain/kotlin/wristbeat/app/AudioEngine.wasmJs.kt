@@ -81,6 +81,18 @@ actual class AudioEngine actual constructor() {
             }
             // Ported from the prototype's SND.thud(t) (wristbeat-prototype.html:215).
             SoundId.THUD -> jsOscRamp(ctx, "sine", 130.0, 55.0, atSeconds, 0.004, 0.5, 0.16)
+            // Marks section changes and the final chord: a bright wash with a long tail, over a
+            // short, darker splash for the attack.
+            SoundId.CRASH -> {
+                jsNoise(ctx, noise, atSeconds, 1.4, 0.13, "highpass", 5200.0, 1.0)
+                jsNoise(ctx, noise, atSeconds, 0.3, 0.12, "bandpass", 3400.0, 0.8)
+            }
+            // A pitched drum for fills into a new section; [param] is the MIDI note it drops from.
+            SoundId.TOM -> {
+                val freq = mtof(param)
+                jsOscRamp(ctx, "sine", freq, freq * 0.6, atSeconds, 0.004, 0.55, 0.2)
+                jsNoise(ctx, noise, atSeconds, 0.03, 0.1, "bandpass", 1200.0, 1.0)
+            }
         }
     }
 }
@@ -148,10 +160,11 @@ private fun jsOscRamp(ctx: JsAny, type: String, f0: Double, f1: Double, t: Doubl
     }"""
 )
 
-// Ported from the prototype's noise(t, dur, peak, type, freq, q) (wristbeat-prototype.html:174).
+// Ported from the prototype's noise(t, dur, peak, type, freq, q) (wristbeat-prototype.html:174). The
+// buffer loops so a long tail (the crash) doesn't run off the end of the 1s noise buffer.
 private fun jsNoise(ctx: JsAny, buffer: JsAny, t: Double, dur: Double, peak: Double, filterType: String, freq: Double, q: Double): Unit = js(
     """{
-        var s = ctx.createBufferSource(); s.buffer = buffer;
+        var s = ctx.createBufferSource(); s.buffer = buffer; s.loop = true;
         s.playbackRate.value = 0.8 + Math.random() * 0.4;
         var f = ctx.createBiquadFilter(); f.type = filterType; f.frequency.value = freq; f.Q.value = q;
         var g = ctx.createGain();

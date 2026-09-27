@@ -47,6 +47,7 @@ import wristbeat.core.Rank
 import wristbeat.core.SECONDS_PER_BEAT
 import wristbeat.core.SNAP_CRABS_END_BEATS
 import wristbeat.core.ScoreTally
+import wristbeat.core.SnapCrabsSong
 import wristbeat.core.SnapCrabsStage
 import wristbeat.core.SoundId
 
@@ -287,8 +288,9 @@ fun SnapCrabsScreen(calibration: Calibration, chart: ChartSetting, onRunningChan
 }
 
 private fun sectionLabel(beat: Double): String = when {
-    beat < CALL_BAR_BEATS -> "Get ready…"
-    (beat - CALL_BAR_BEATS) % CYCLE_BEATS < CALL_BAR_BEATS -> "Watch the lead crab"
+    beat < SnapCrabsSong.VERSE -> "Get ready…"
+    beat >= SnapCrabsSong.OUTRO -> "Nice snapping!"
+    (beat - SnapCrabsSong.VERSE) % CYCLE_BEATS < CALL_BAR_BEATS -> "Watch the lead crab"
     else -> "Your turn — repeat it"
 }
 

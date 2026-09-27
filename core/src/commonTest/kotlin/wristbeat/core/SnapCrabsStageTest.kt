@@ -3,6 +3,7 @@ package wristbeat.core
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class SnapCrabsStageTest {
     @Test fun firstTargetIsFourBeatsAfterFirstLeadCue() {
@@ -68,5 +69,20 @@ class SnapCrabsStageTest {
         val stage = SnapCrabsStage(inputOffsetMs = 200.0)
         assertEquals(10.0 - 0.2 / SECONDS_PER_BEAT, stage.perceivedBeat(10.0), 1e-9)
         assertEquals(10.0, SnapCrabsStage().perceivedBeat(10.0))
+    }
+
+    @Test fun songHasAnIntroBeforeTheFirstCallAndAnOutroAfterTheLastTarget() {
+        val stage = SnapCrabsStage()
+        assertEquals(SnapCrabsSong.VERSE, stage.leadCues.first())
+        assertTrue(stage.chart.any { it.beat < SnapCrabsSong.VERSE - 4 && it.sound == SoundId.MEL })
+        assertTrue(stage.targets.last() < SnapCrabsSong.OUTRO)
+        assertTrue(stage.chart.any { it.beat == SnapCrabsSong.FINAL && it.sound == SoundId.CRASH })
+        assertTrue(stage.chart.all { it.beat < stage.end })
+    }
+
+    @Test fun chorusBringsInTheMelody() {
+        val melodyBeats = Charts.snapCrabsBacking().filter { it.sound == SoundId.MEL }.map { it.beat }
+        assertTrue(melodyBeats.count { it >= SnapCrabsSong.CHORUS && it < SnapCrabsSong.OUTRO } >
+            melodyBeats.count { it >= SnapCrabsSong.VERSE && it < SnapCrabsSong.CHORUS })
     }
 }

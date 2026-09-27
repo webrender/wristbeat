@@ -72,6 +72,15 @@ actual class AudioEngine actual constructor() {
                 osc(Wave.SINE, 2400.0, t, 0.004, 0.12, 0.1, endFreq = 900.0)
             }
             SoundId.THUD -> osc(Wave.SINE, 130.0, t, 0.004, 0.5, 0.16, endFreq = 55.0)
+            SoundId.CRASH -> {
+                noise(t, 1.4, 0.13, FilterType.HIGHPASS, 5200.0, 1.0)
+                noise(t, 0.3, 0.12, FilterType.BANDPASS, 3400.0, 0.8)
+            }
+            SoundId.TOM -> {
+                val freq = mtof(param)
+                osc(Wave.SINE, freq, t, 0.004, 0.55, 0.2, endFreq = freq * 0.6)
+                noise(t, 0.03, 0.1, FilterType.BANDPASS, 1200.0, 1.0)
+            }
         }
     }
 }

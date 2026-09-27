@@ -48,6 +48,7 @@ import wristbeat.core.ChopAction
 import wristbeat.core.Fruit
 import wristbeat.core.Grade
 import wristbeat.core.MANGO_CHOP_END_BEATS
+import wristbeat.core.MangoChopSong
 import wristbeat.core.MANGO_CHOP_BPM
 import wristbeat.core.MangoChopStage
 import wristbeat.core.Rank
@@ -326,7 +327,7 @@ fun MangoChopScreen(calibration: Calibration, chart: ChartSetting, onRunningChan
                 else -> WatchAutoHide("run") {
                     HudChip {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            HudText(if (beatPosition < 4.0) "Get ready…" else "Chop on the landing", loud = true)
+                            HudText(runLabel(beatPosition, stage), loud = true)
                             Spacer(Modifier.height(2.dp))
                             HudText(tallyLine(tally), color = Color(0xFFAAB8B5))
                         }
@@ -335,6 +336,12 @@ fun MangoChopScreen(calibration: Calibration, chart: ChartSetting, onRunningChan
             }
         }
     }
+}
+
+private fun runLabel(beat: Double, stage: MangoChopStage): String = when {
+    beat < MangoChopSong.VERSE -> "Get ready…"
+    beat > stage.tosses.last().landBeat + 1 -> "Nice chopping!"
+    else -> "Chop on the landing"
 }
 
 private fun highwayNote(fruit: Fruit, beat: Double, cue: Boolean): HighwayNote {
