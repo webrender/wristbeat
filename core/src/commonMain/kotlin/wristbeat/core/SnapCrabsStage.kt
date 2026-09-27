@@ -25,7 +25,8 @@ data class TapOutcome(val grade: Grade?, val errorMs: Double)
  *
  * [inputOffsetMs] is Calibrate's measured offset (positive = the player's taps land late). It's
  * subtracted from every tap and miss check, so a consistently late or early player is judged
- * against where they actually hear the beat rather than the raw audio clock.
+ * against where they actually hear the beat rather than the raw audio clock. Screens draw at
+ * [perceivedBeat] for the same reason, so a note crosses the hit line when a perfect tap lands.
  */
 class SnapCrabsStage(inputOffsetMs: Double = 0.0) {
     private val offsetBeats = inputOffsetMs / 1000.0 / SECONDS_PER_BEAT
@@ -89,6 +90,13 @@ class SnapCrabsStage(inputOffsetMs: Double = 0.0) {
             }
         }
     }
+
+    /**
+     * The beat the player perceives at raw audio-clock beat [rawBeat]: the raw beat minus the
+     * calibrated offset. Visuals follow this, so with a laggy output (e.g. Bluetooth) they wait
+     * for the sound instead of running ahead of it.
+     */
+    fun perceivedBeat(rawBeat: Double): Double = rawBeat - offsetBeats
 
     fun isFinished(currentBeat: Double): Boolean = currentBeat >= end
 

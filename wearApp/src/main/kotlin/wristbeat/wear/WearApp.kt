@@ -32,6 +32,7 @@ import kotlin.math.roundToInt
 import wristbeat.app.ChartSetting
 import wristbeat.app.Stage
 import wristbeat.app.WatchStageScreen
+import wristbeat.app.rememberCalibration
 import wristbeat.app.wristbeatFontFamily
 
 private const val MENU_ROUTE = "menu"
@@ -46,9 +47,8 @@ private val Teal = Color(0xFF2FBF9E)
  */
 @Composable
 fun WearApp() {
-    // Same app-wide state the phone/web App() holds: in-memory calibration offset and chart toggle.
-    var inputOffsetMs by remember { mutableStateOf(0.0) }
-    var calibrated by remember { mutableStateOf(false) }
+    // Same app-wide state the phone/web App() holds: the saved per-output calibration and chart toggle.
+    val calibration = rememberCalibration()
     var showChart by remember { mutableStateOf(true) }
     var running by remember { mutableStateOf(false) }
     val chart = ChartSetting(showChart) { showChart = !showChart }
@@ -68,7 +68,7 @@ fun WearApp() {
         ) {
             composable(MENU_ROUTE) {
                 StageMenu(
-                    offsetLabel = if (calibrated) "Offset ${formatOffset(inputOffsetMs)}" else "Start here",
+                    offsetLabel = calibration.offsetMs?.let { "Offset ${formatOffset(it)}" } ?: "Start here",
                     chartOn = showChart,
                     onChartChange = { showChart = it },
                     onSelect = { navController.navigate(it.name) },
@@ -78,11 +78,7 @@ fun WearApp() {
                 composable(stage.name) {
                     WatchStageScreen(
                         stage = stage,
-                        inputOffsetMs = inputOffsetMs,
-                        onCalibrated = {
-                            inputOffsetMs = it
-                            calibrated = true
-                        },
+                        calibration = calibration,
                         chart = chart,
                         onRunningChanged = { running = it },
                     )

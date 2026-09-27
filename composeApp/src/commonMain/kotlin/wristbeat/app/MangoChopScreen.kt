@@ -79,11 +79,11 @@ private enum class Cut { NONE, LEFT, RIGHT, TOP, BOTTOM }
  * On desktop, a mouse drag works the same way, and D/K/arrows slice (see [rememberTapKeyModifier]).
  */
 @Composable
-fun MangoChopScreen(inputOffsetMs: Double, chart: ChartSetting, onRunningChanged: (Boolean) -> Unit = {}) {
+fun MangoChopScreen(calibration: Calibration, chart: ChartSetting, onRunningChanged: (Boolean) -> Unit = {}) {
     val audioClock = remember { AudioClock() }
     val audioEngine = remember { AudioEngine() }
     val haptics = remember { HapticEngine() }
-    var stage by remember { mutableStateOf(MangoChopStage(inputOffsetMs)) }
+    var stage by remember { mutableStateOf(MangoChopStage(calibration.inputOffsetMs)) }
     val secondsPerBeat = stage.secondsPerBeat
 
     var started by remember { mutableStateOf(false) }
@@ -121,12 +121,14 @@ fun MangoChopScreen(inputOffsetMs: Double, chart: ChartSetting, onRunningChanged
                 scheduledIndex++
             }
 
-            val beat = (now - t0) / secondsPerBeat
+            val rawBeat = (now - t0) / secondsPerBeat
+            // Drawn at the beat the player hears (see SnapCrabsScreen), so fruit lands with its sound.
+            val beat = stage.perceivedBeat(rawBeat)
             beatPosition = beat
             sinceChop += dt
             sinceSlash += dt
 
-            if (stage.updateMisses(beat).isNotEmpty()) audioEngine.play(SoundId.THUD, now)
+            if (stage.updateMisses(rawBeat).isNotEmpty()) audioEngine.play(SoundId.THUD, now)
             tally = stage.tally()
 
             if (stage.isFinished(beat)) finished = true
@@ -139,8 +141,9 @@ fun MangoChopScreen(inputOffsetMs: Double, chart: ChartSetting, onRunningChanged
     fun handleMenuPress(): Boolean {
         if (!started) {
             audioClock.start()
+            calibration.refreshOutput()
             // Fresh stage per run: judged tosses and the tally don't carry over into a replay.
-            stage = MangoChopStage(inputOffsetMs)
+            stage = MangoChopStage(calibration.inputOffsetMs)
             t0 = audioClock.now() + 0.3
             scheduledIndex = 0
             beatPosition = -1.0
@@ -315,10 +318,7 @@ fun MangoChopScreen(inputOffsetMs: Double, chart: ChartSetting, onRunningChanged
                                     color = Color(0xFFAAB8B5),
                                 )
                                 HudText("Keys: Space/J/F chop · D/K/arrows slice", color = Color(0xFFAAB8B5))
-                                HudText(
-                                    if (inputOffsetMs == 0.0) "Not calibrated" else "Calibrated offset ${formatMs(inputOffsetMs)}",
-                                    color = Color(0xFFAAB8B5),
-                                )
+                                HudText(calibration.statusLine(), color = Color(0xFFAAB8B5))
                             }
                         }
                     }
@@ -444,7 +444,7 @@ private fun DrawScope.drawToss(
     val side = if (fruit == Fruit.PINEAPPLE) -1f else 1f
     when {
         result?.hit == true -> {
-            val dt = ((beat - result.rawBeat) * secondsPerBeat).toFloat()
+            val dt = ((beat - result.beat) * secondsPerBeat).toFloat()
             if (dt > 1.2f || dt < 0f) return
             if (fruit.action == ChopAction.CHOP) {
                 val dx = 60f * dt + 10f

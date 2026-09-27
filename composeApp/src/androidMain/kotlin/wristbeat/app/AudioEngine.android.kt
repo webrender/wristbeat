@@ -50,6 +50,12 @@ actual class AudioEngine actual constructor() {
                 osc(Wave.SINE, freq * 2.0, t, 0.003, 0.05, 0.2)
                 osc(Wave.SINE, freq * 3.0, t, 0.003, 0.02, 0.08)
             }
+            SoundId.KEYS -> {
+                val freq = mtof(param)
+                osc(Wave.SQUARE, freq, t, 0.003, 0.022, 0.09)
+                osc(Wave.SINE, freq / 2.0, t, 0.003, 0.05, 0.11)
+            }
+            SoundId.SHAKER -> noise(t, 0.035, 0.06, FilterType.HIGHPASS, 6500.0, 1.0)
             SoundId.WHISTLE_MANGO -> whistle(t, 0.26, 520.0, 1150.0)
             SoundId.WHISTLE_LIME -> whistle(t, 0.13, 950.0, 1900.0)
             SoundId.WHISTLE_PINEAPPLE -> {

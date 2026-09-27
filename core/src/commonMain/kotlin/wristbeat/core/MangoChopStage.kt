@@ -20,8 +20,11 @@ data class Toss(val beat: Double, val fruit: Fruit) {
     val landBeat: Double get() = beat + fruit.airBeats
 }
 
-/** How a toss was resolved: a graded hit (with the raw beat it happened on, for the cut animation) or a miss. */
-data class TossResult(val grade: Grade?, val rawBeat: Double) {
+/**
+ * How a toss was resolved: a graded hit or a miss. [beat] is when it happened, as a
+ * [MangoChopStage.perceivedBeat], so the cut/bounce animation starts in step with the visuals.
+ */
+data class TossResult(val grade: Grade?, val beat: Double) {
     val hit: Boolean get() = grade != null
 }
 
@@ -52,7 +55,8 @@ const val MANGO_CHOP_END_BEATS = 76.0
  * on a fruit is a stray: it consumes nothing, so the player can still correct it inside the
  * window, and otherwise the fruit bounces off as a miss.
  *
- * [inputOffsetMs] is Calibrate's measured offset, applied the same way as in [SnapCrabsStage].
+ * [inputOffsetMs] is Calibrate's measured offset, applied the same way as in [SnapCrabsStage],
+ * including [perceivedBeat] for the visuals.
  */
 class MangoChopStage(inputOffsetMs: Double = 0.0) {
     val secondsPerBeat = 60.0 / MANGO_CHOP_BPM
@@ -91,7 +95,7 @@ class MangoChopStage(inputOffsetMs: Double = 0.0) {
             ?: return ChopOutcome(null, null, null)
         val errorMs = (beat - tosses[index].landBeat) * secondsPerBeat * 1000.0
         val grade = judge(errorMs) ?: return ChopOutcome(null, errorMs, null)
-        results[index] = TossResult(grade, rawBeat)
+        results[index] = TossResult(grade, beat)
         if (grade == Grade.PERFECT) perfect++ else ok++
         return ChopOutcome(grade, errorMs, index)
     }
@@ -102,13 +106,16 @@ class MangoChopStage(inputOffsetMs: Double = 0.0) {
         val newlyMissed = mutableListOf<Int>()
         for (i in tosses.indices) {
             if (results[i] == null && isMissed(beat, tosses[i].landBeat, secondsPerBeat)) {
-                results[i] = TossResult(null, rawBeat)
+                results[i] = TossResult(null, beat)
                 miss++
                 newlyMissed += i
             }
         }
         return newlyMissed
     }
+
+    /** The raw audio-clock beat minus the calibrated offset; see [SnapCrabsStage.perceivedBeat]. */
+    fun perceivedBeat(rawBeat: Double): Double = rawBeat - offsetBeats
 
     fun isFinished(currentBeat: Double): Boolean = currentBeat >= end
 

@@ -2,6 +2,7 @@ package wristbeat.app
 
 import android.content.Context
 import android.media.AudioAttributes
+import android.media.AudioDeviceInfo
 import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioTimestamp
@@ -103,6 +104,9 @@ internal object AndroidAudio {
         if (seconds > lastNow) lastNow = seconds
         return lastNow
     }
+
+    /** The output device the stream is playing through, or null before it starts. */
+    fun routedDevice(): AudioDeviceInfo? = track?.routedDevice
 
     fun schedule(voice: SynthVoice) {
         pending += voice

@@ -60,11 +60,11 @@ private const val CYCLE_BEATS = 8.0
  * of time, not just reacted to after the fact.
  */
 @Composable
-fun SnapCrabsScreen(inputOffsetMs: Double, chart: ChartSetting, onRunningChanged: (Boolean) -> Unit = {}) {
+fun SnapCrabsScreen(calibration: Calibration, chart: ChartSetting, onRunningChanged: (Boolean) -> Unit = {}) {
     val audioClock = remember { AudioClock() }
     val audioEngine = remember { AudioEngine() }
     val haptics = remember { HapticEngine() }
-    var stage by remember { mutableStateOf(SnapCrabsStage(inputOffsetMs)) }
+    var stage by remember { mutableStateOf(SnapCrabsStage(calibration.inputOffsetMs)) }
 
     var started by remember { mutableStateOf(false) }
     var finished by remember { mutableStateOf(false) }
@@ -102,7 +102,10 @@ fun SnapCrabsScreen(inputOffsetMs: Double, chart: ChartSetting, onRunningChanged
                 scheduledIndex++
             }
 
-            val beat = (now - t0) / SECONDS_PER_BEAT
+            val rawBeat = (now - t0) / SECONDS_PER_BEAT
+            // Everything drawn follows the beat the player hears, which lags the raw audio clock by
+            // the calibrated offset on a laggy output like a Bluetooth headset.
+            val beat = stage.perceivedBeat(rawBeat)
             beatPosition = beat
 
             val beatIndex = floor(beat).toInt()
@@ -123,7 +126,7 @@ fun SnapCrabsScreen(inputOffsetMs: Double, chart: ChartSetting, onRunningChanged
             targetPulsePhase = (targetPulsePhase - dt * 5f).coerceAtLeast(0f)
             playerPulsePhase = (playerPulsePhase - dt * 5f).coerceAtLeast(0f)
 
-            stage.updateMisses(beat)
+            stage.updateMisses(rawBeat)
             tally = stage.tally()
 
             if (stage.isFinished(beat)) finished = true
@@ -133,8 +136,9 @@ fun SnapCrabsScreen(inputOffsetMs: Double, chart: ChartSetting, onRunningChanged
     fun handleTap() {
         if (!started) {
             audioClock.start()
+            calibration.refreshOutput()
             // Fresh stage per run: judged targets and the tally don't carry over into a replay.
-            stage = SnapCrabsStage(inputOffsetMs)
+            stage = SnapCrabsStage(calibration.inputOffsetMs)
             t0 = audioClock.now() + 0.3
             scheduledIndex = 0
             lastFiredBeat = -1
@@ -263,10 +267,7 @@ fun SnapCrabsScreen(inputOffsetMs: Double, chart: ChartSetting, onRunningChanged
                             )
                             // The watch menu shows the offset under Calibrate instead.
                             if (!watch) {
-                                HudText(
-                                    if (inputOffsetMs == 0.0) "Not calibrated" else "Calibrated offset ${formatMs(inputOffsetMs)}",
-                                    color = Color(0xFFAAB8B5),
-                                )
+                                HudText(calibration.statusLine(), color = Color(0xFFAAB8B5))
                             }
                         }
                     }

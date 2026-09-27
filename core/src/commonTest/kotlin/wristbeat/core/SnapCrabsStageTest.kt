@@ -63,4 +63,10 @@ class SnapCrabsStageTest {
         stage.updateMisses(justPastRawWindow)
         assertEquals(0, stage.tally().miss)
     }
+
+    @Test fun perceivedBeatSubtractsTheOffset() {
+        val stage = SnapCrabsStage(inputOffsetMs = 200.0)
+        assertEquals(10.0 - 0.2 / SECONDS_PER_BEAT, stage.perceivedBeat(10.0), 1e-9)
+        assertEquals(10.0, SnapCrabsStage().perceivedBeat(10.0))
+    }
 }

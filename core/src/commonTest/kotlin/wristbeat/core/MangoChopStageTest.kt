@@ -85,4 +85,26 @@ class MangoChopStageTest {
         }
         assertTrue(stage.chart.any { it.sound == SoundId.STEEL_PAN })
     }
+
+    @Test fun hasItsOwnSongRatherThanSnapCrabsBand() {
+        val mango = Charts.mangoChopBacking(MANGO_CHOP_END_BEATS)
+        val uke = setOf(SoundId.UKE_F, SoundId.UKE_C, SoundId.UKE_BB)
+        assertTrue(mango.none { it.sound in uke || it.sound == SoundId.MEL })
+        assertTrue(mango.any { it.sound == SoundId.KEYS } && mango.any { it.sound == SoundId.SHAKER })
+        // The steel pan stays under the whistles (the lowest starts at 520Hz, about MIDI 72).
+        assertTrue(mango.filter { it.sound == SoundId.STEEL_PAN }.all { it.param <= 74.0 })
+    }
+
+    @Test fun perceivedBeatSubtractsTheOffset() {
+        val stage = MangoChopStage(inputOffsetMs = 200.0)
+        assertEquals(10.0 - 0.2 / stage.secondsPerBeat, stage.perceivedBeat(10.0), 1e-9)
+    }
+
+    @Test fun resultBeatIsPerceivedSoAnimationsLineUpWithTheVisuals() {
+        val stage = MangoChopStage(inputOffsetMs = 200.0)
+        val i = firstToss(stage, Fruit.MANGO)
+        val rawTap = stage.tosses[i].landBeat + 0.2 / stage.secondsPerBeat
+        stage.recordAction(ChopAction.CHOP, rawTap)
+        assertEquals(stage.tosses[i].landBeat, stage.resultOf(i)!!.beat, 1e-9)
+    }
 }

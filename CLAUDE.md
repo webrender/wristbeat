@@ -24,14 +24,17 @@ build and launch the shared `App()`), but their platform actuals are placeholder
     Charts are authored in beats; each stage exposes its own seconds-per-beat where it differs.
   - `Judgment.kt` — `Grade`, `ScoreTally`, `Rank` and the PERFECT/OK/miss math.
   - `Chart.kt` — `SoundId`, `ChartEvent`, and `Charts` (procedural chart generators:
-    `snapCrabsBacking`, and `mangoChopBacking`, which is the same band plus a steel pan riff).
+    `snapCrabsBacking`, the prototype's ukulele band, and `mangoChopBacking`, Mango Chop's own soca
+    song in A minor with keyboard stabs, shaker and a steel pan tune).
   - `CalibrateStage.kt`, `SnapCrabsStage.kt`, `MangoChopStage.kt` — per-stage state machines
-    (`recordTap`/`recordAction`, `updateMisses`, `tally`).
+    (`recordTap`/`recordAction`, `updateMisses`, `tally`, and `perceivedBeat`, which the screens draw
+    at so visuals follow the calibrated offset).
 - **`composeApp/`** — the Compose UI and platform adapters.
   - `commonMain` — `App.kt` (stage switching), `CalibrateScreen.kt`, `SnapCrabsScreen.kt`,
     `MangoChopScreen.kt`,
     `Hud.kt` (shared HUD text/chip styling), `StageHud.kt` (each stage's top HUD — title, chart
-    toggle, legend — laid out around the stage tabs), `NoteHighway.kt` (the shared note highway), `InputHandling.kt` (keyboard tap support), and
+    toggle, legend — laid out around the stage tabs), `NoteHighway.kt` (the shared note highway), `InputHandling.kt` (keyboard tap support),
+    `Calibration.kt` (the calibration offset, saved per audio output — see **Calibration** below), and
     `expect` declarations for `AudioClock`/`AudioEngine`/`HapticEngine`.
   - `wasmJsMain` — the `actual` implementations: `AudioClock` wraps `AudioContext`'s output
     timestamp, `AudioEngine` synthesizes every sound via Web Audio `js()` interop
@@ -62,8 +65,8 @@ into the same timebase before judging, per HANDOFF's timing-accuracy requirement
   The note highway (the "visual beat indicator chart") can be toggled off via the `Chart: On/Off`
   button under the stage label, for playing by ear alone. That setting is app-wide (held in
   `App.kt`), so it applies to every stage with a highway.
-- **Mango Chop** — playable at 132 BPM (faster than the other stages' 116), with a steel pan added
-  to the band. A whistle marks each toss: mangoes land 2 beats later and limes 1 beat later, and
+- **Mango Chop** — playable at 140 BPM (faster than the other stages' 116, since it's the harder
+  level), with its own song (`Charts.mangoChopBacking`) rather than Snap Crabs' band. A whistle marks each toss: mangoes land 2 beats later and limes 1 beat later, and
   both are chopped with a tap. Pineapples (introduced in the third section, tossed from the right
   with a falling double whistle) land 2 beats later and need a **swipe** to slice. The wrong action
   is a stray: it consumes nothing, and the fruit bounces off as a miss if it isn't corrected in time.
@@ -77,6 +80,14 @@ into the same timebase before judging, per HANDOFF's timing-accuracy requirement
   delaying chops, a press chops immediately when the nearest open fruit wants a chop. When a
   pineapple is nearest, the press waits: it slices if it becomes a swipe, and otherwise chops on
   release, judged at the moment the finger landed. On the keyboard, D/K/arrow keys slice.
+- **Calibration** — Calibrate's offset is saved per audio output (`Calibration.kt`): Android keys it
+  by the routed device (the `AudioTrack`'s routed device, or a Bluetooth > wired > speaker guess
+  before the stream starts) in `SharedPreferences`; the web can't see the output device, so it keeps
+  one offset in `localStorage`. The output is re-checked every second and at the start of each run,
+  so connecting a Bluetooth headset switches to its offset. Besides shifting judgment, the offset
+  also delays the visuals (`perceivedBeat`), so on Bluetooth the highway and animations wait for the
+  sound instead of running ahead of it. Calibrate's own dial runs on the raw clock, so its copy asks
+  the player to tap to the sound.
 - **UI conventions established through iteration** (deviating from these should be a deliberate
   choice, not an accident):
   - No app-level header/footer chrome. `App.kt` has no title bar; stage switching is a small tab
@@ -108,8 +119,8 @@ into the same timebase before judging, per HANDOFF's timing-accuracy requirement
 - **Watch UI** (`wearApp/.../WearApp.kt`) — the phone/web tabs and top HUD took up the whole
   watch face, so the watch has its own shell built on Wear Compose Material 1.4 (matches Compose
   1.7; Wear Material 3 would need a newer Compose). A native menu (`ScalingLazyColumn` of `Chip`s,
-  `TimeText`, and a `ToggleChip` for the chart) picks a stage, with the calibration offset under
-  Calibrate. Each stage opens full screen via `SwipeDismissableNavHost`; swiping right returns to the
+  `TimeText`, and a `ToggleChip` for the chart) picks a stage, with the saved calibration offset
+  for the current output under Calibrate. Each stage opens full screen via `SwipeDismissableNavHost`; swiping right returns to the
   menu, except mid-run (swipe-to-dismiss is disabled while a run is in progress, since a sloppy tap
   or a Mango Chop slice would otherwise quit). The screen stays on during a run. Stages render
   through `App.kt`'s `WatchStageScreen`, which sets `HudLayout(watch = true)`: `StageHeader` draws
@@ -154,7 +165,7 @@ screenshot check. Say so explicitly rather than claiming a visual change looks r
 
 An Oboe/AAudio (native) audio path — Android audio currently runs on a Java `AudioTrack`, which
 works but may have more output latency on some devices — any Wear-specific UI (round-screen
-layout beyond the menu and HUD trimming above, e.g. stage art tuned for a round face), a chart format/editor (charts are currently hard-coded Kotlin, e.g.
-`Charts.snapCrabsBacking`), and per-device/per-audio-route calibration storage. None
+layout beyond the menu and HUD trimming above, e.g. stage art tuned for a round face), and a chart format/editor (charts are currently hard-coded Kotlin, e.g.
+`Charts.snapCrabsBacking`). None
 of these are in progress — don't start them without Jeremy asking, per his stated plan to dial in
 the web app first.

@@ -52,6 +52,15 @@ actual class AudioEngine actual constructor() {
                 jsOsc(ctx, "sine", freq * 2.0, atSeconds, 0.003, 0.05, 0.2)
                 jsOsc(ctx, "sine", freq * 3.0, atSeconds, 0.003, 0.02, 0.08)
             }
+            // Mango Chop's offbeat chord stab: a short, bright square with a sine an octave down
+            // for body, clipped instead of strummed so it doesn't read as Snap Crabs' ukulele.
+            SoundId.KEYS -> {
+                val freq = mtof(param)
+                jsOsc(ctx, "square", freq, atSeconds, 0.003, 0.022, 0.09)
+                jsOsc(ctx, "sine", freq / 2.0, atSeconds, 0.003, 0.05, 0.11)
+            }
+            // Mango Chop's 16th-note shaker, filtered well above the whistles.
+            SoundId.SHAKER -> jsNoise(ctx, noise, atSeconds, 0.035, 0.06, "highpass", 6500.0, 1.0)
             // Ported from the prototype's SND.whistle(t, dur, f0, f1) (wristbeat-prototype.html:198).
             SoundId.WHISTLE_MANGO -> whistle(ctx, noise, atSeconds, 0.26, 520.0, 1150.0)
             SoundId.WHISTLE_LIME -> whistle(ctx, noise, atSeconds, 0.13, 950.0, 1900.0)

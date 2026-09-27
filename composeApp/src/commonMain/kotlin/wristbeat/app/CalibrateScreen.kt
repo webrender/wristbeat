@@ -51,9 +51,13 @@ import wristbeat.core.SECONDS_PER_BEAT
  * Two other fixes live here too: no sound plays for the player's own tap (it was masking the click
  * track and making calibration harder to judge), and the beat indicator sweeps continuously across
  * each beat so the player can anticipate a click instead of only reacting to a flash after it lands.
+ *
+ * The dial runs on the raw audio clock, so on a laggy output (Bluetooth) it leads the click; the
+ * copy asks the player to tap to the sound, since that lag is exactly what the offset measures.
+ * The result is saved for the current audio output (see [Calibration]).
  */
 @Composable
-fun CalibrateScreen(onCalibrated: (offsetMs: Double) -> Unit, onRunningChanged: (Boolean) -> Unit = {}) {
+fun CalibrateScreen(calibration: Calibration, onRunningChanged: (Boolean) -> Unit = {}) {
     val audioClock = remember { AudioClock() }
     val audioEngine = remember { AudioEngine() }
     val haptics = remember { HapticEngine() }
@@ -105,7 +109,7 @@ fun CalibrateScreen(onCalibrated: (offsetMs: Double) -> Unit, onRunningChanged: 
             if (beat >= CALIBRATE_TOTAL_BEATS && result == null) {
                 val r = stage.finish()
                 result = r
-                if (r.ok) onCalibrated(r.offsetMs)
+                if (r.ok) calibration.record(r.offsetMs)
                 finished = true
             }
         }
@@ -204,7 +208,10 @@ fun CalibrateScreen(onCalibrated: (offsetMs: Double) -> Unit, onRunningChanged: 
                                 loud = true,
                             )
                             Spacer(Modifier.height(2.dp))
-                            if (!watch) HudText("from ${r.tapCount} taps", color = Color(0xFFAAB8B5))
+                            if (!watch) {
+                                val forOutput = calibration.output.label?.takeIf { r.ok }?.let { " · saved for $it" } ?: ""
+                                HudText("from ${r.tapCount} taps$forOutput", color = Color(0xFFAAB8B5))
+                            }
                             HudText("Tap to try again", color = Color(0xFFAAB8B5))
                         }
                     }
@@ -219,10 +226,12 @@ fun CalibrateScreen(onCalibrated: (offsetMs: Double) -> Unit, onRunningChanged: 
                                     "~${runLengthSeconds}s · tap every beat"
                                 } else {
                                     "$CALIBRATE_TOTAL_BEATS beats, about ${runLengthSeconds}s — a $CALIBRATE_COUNT_IN_BEATS-beat " +
-                                        "count-in, then tap every beat"
+                                        "count-in, then tap every click you hear"
                                 },
                                 color = Color(0xFFAAB8B5),
                             )
+                            // Recalibrate per output: the watch menu shows the offset instead.
+                            if (!watch) HudText(calibration.statusLine(), color = Color(0xFFAAB8B5))
                         }
                     }
                 }
@@ -232,7 +241,7 @@ fun CalibrateScreen(onCalibrated: (offsetMs: Double) -> Unit, onRunningChanged: 
                     WatchAutoHide("run") {
                         HudChip {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                HudText(if (beatIndex < CALIBRATE_COUNT_IN_BEATS) "Get ready…" else "Tap with the click", loud = true)
+                                HudText(if (beatIndex < CALIBRATE_COUNT_IN_BEATS) "Get ready…" else "Tap to the sound", loud = true)
                                 Spacer(Modifier.height(2.dp))
                                 val shownBeat = beatIndex.coerceIn(0, CALIBRATE_TOTAL_BEATS)
                                 HudText(

@@ -40,9 +40,8 @@ enum class Stage(val label: String, val shortLabel: String, val enabled: Boolean
 @Composable
 fun App() {
     var stage by remember { mutableStateOf(Stage.CALIBRATE) }
-    // Calibrate's measured tap offset, applied when judging Snap Crabs and Mango Chop. In-memory only for now —
-    // per-device storage isn't built yet, so it resets when the app restarts.
-    var inputOffsetMs by remember { mutableStateOf(0.0) }
+    // Calibrate's measured tap offset, saved per audio output and applied to Snap Crabs and Mango Chop.
+    val calibration = rememberCalibration()
 
     // One note highway ("chart") setting for every stage that has one, so hiding it to play by ear
     // carries over when switching games.
@@ -60,9 +59,9 @@ fun App() {
 
             CompositionLocalProvider(LocalHudLayout provides hudLayout) {
                 when (stage) {
-                    Stage.CALIBRATE -> CalibrateScreen(onCalibrated = { inputOffsetMs = it })
-                    Stage.SNAP_CRABS -> SnapCrabsScreen(inputOffsetMs, chart)
-                    Stage.MANGO_CHOP -> MangoChopScreen(inputOffsetMs, chart)
+                    Stage.CALIBRATE -> CalibrateScreen(calibration)
+                    Stage.SNAP_CRABS -> SnapCrabsScreen(calibration, chart)
+                    Stage.MANGO_CHOP -> MangoChopScreen(calibration, chart)
                 }
             }
             StageTabs(
@@ -107,8 +106,7 @@ private fun StageTabs(current: Stage, onSelect: (Stage) -> Unit, compact: Boolea
 @Composable
 fun WatchStageScreen(
     stage: Stage,
-    inputOffsetMs: Double,
-    onCalibrated: (offsetMs: Double) -> Unit,
+    calibration: Calibration,
     chart: ChartSetting,
     onRunningChanged: (Boolean) -> Unit,
 ) {
@@ -116,9 +114,9 @@ fun WatchStageScreen(
         Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0F1B19))) {
             CompositionLocalProvider(LocalHudLayout provides HudLayout(watch = true)) {
                 when (stage) {
-                    Stage.CALIBRATE -> CalibrateScreen(onCalibrated, onRunningChanged)
-                    Stage.SNAP_CRABS -> SnapCrabsScreen(inputOffsetMs, chart, onRunningChanged)
-                    Stage.MANGO_CHOP -> MangoChopScreen(inputOffsetMs, chart, onRunningChanged)
+                    Stage.CALIBRATE -> CalibrateScreen(calibration, onRunningChanged)
+                    Stage.SNAP_CRABS -> SnapCrabsScreen(calibration, chart, onRunningChanged)
+                    Stage.MANGO_CHOP -> MangoChopScreen(calibration, chart, onRunningChanged)
                 }
             }
         }
