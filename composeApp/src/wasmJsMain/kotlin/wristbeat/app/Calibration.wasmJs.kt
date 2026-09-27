@@ -13,7 +13,8 @@ internal actual fun saveCalibrationMs(outputId: String, offsetMs: Double) {
     jsStorageSet(KEY_PREFIX + outputId, offsetMs.toString())
 }
 
-// localStorage can throw (private windows, blocked site data); calibration then just isn't saved.
-private fun jsStorageGet(key: String): String? = js("{ try { return window.localStorage.getItem(key); } catch (e) { return null; } }")
+// localStorage can throw (private windows, blocked site data); calibration and records then just
+// aren't saved.
+internal fun jsStorageGet(key: String): String? = js("{ try { return window.localStorage.getItem(key); } catch (e) { return null; } }")
 
-private fun jsStorageSet(key: String, value: String): Unit = js("{ try { window.localStorage.setItem(key, value); } catch (e) {} }")
+internal fun jsStorageSet(key: String, value: String): Unit = js("{ try { window.localStorage.setItem(key, value); } catch (e) {} }")

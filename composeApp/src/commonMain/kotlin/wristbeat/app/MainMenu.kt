@@ -56,12 +56,13 @@ import wristbeat.core.SECONDS_PER_BEAT
 fun MainMenu(calibration: Calibration, chart: ChartSetting, onSelect: (Stage) -> Unit) {
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val minDim = minOf(maxWidth, maxHeight).value
-        val titleSize = (minDim * 0.11f).sp
-        val entryLabelSize = (minDim * 0.055f).sp
-        val entrySubtitleSize = (minDim * 0.028f).sp
-        val toggleTextSize = (minDim * 0.04f).sp
-        val entryPadding = (minDim * 0.014f).dp
-        val emblemSize = (minDim * 0.13f).dp
+        // Sized so all five entries and the chart toggle fit without scrolling.
+        val titleSize = (minDim * 0.095f).sp
+        val entryLabelSize = (minDim * 0.05f).sp
+        val entrySubtitleSize = (minDim * 0.026f).sp
+        val toggleTextSize = (minDim * 0.037f).sp
+        val entryPadding = (minDim * 0.011f).dp
+        val emblemSize = (minDim * 0.112f).dp
         val menuWidth = (minOf(maxWidth, maxHeight) * 1.35f).coerceAtMost(maxWidth * 0.92f)
 
         Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0A1614)))
@@ -125,6 +126,7 @@ fun MainMenu(calibration: Calibration, chart: ChartSetting, onSelect: (Stage) ->
                             Stage.SNAP_CRABS -> drawSnapCrabsEmblem(beat)
                             Stage.MANGO_CHOP -> drawMangoChopEmblem(beat)
                             Stage.BONGO_BLITZ -> drawBongoBlitzEmblem(beat)
+                            Stage.REMIX_1 -> drawRemix1Emblem(beat)
                         }
                     },
                     onClick = { onSelect(stage) },
@@ -136,17 +138,14 @@ fun MainMenu(calibration: Calibration, chart: ChartSetting, onSelect: (Stage) ->
     }
 }
 
-private fun menuSubtitle(stage: Stage, calibration: Calibration): String = when (stage) {
-    Stage.CALIBRATE -> calibration.statusLine()
-    Stage.SNAP_CRABS -> "Repeat the lead crab"
-    Stage.MANGO_CHOP -> "Tap to chop, swipe to slice"
-    Stage.BONGO_BLITZ -> "Tap and swipe — copy the monkey's beat"
-}
+/** Only Calibrate has a subtitle (its saved offset); the stages speak for themselves through their emblems. */
+private fun menuSubtitle(stage: Stage, calibration: Calibration): String? =
+    if (stage == Stage.CALIBRATE) calibration.statusLine() else null
 
 @Composable
 private fun MenuEntry(
     label: String,
-    subtitle: String,
+    subtitle: String?,
     accent: Color,
     enabled: Boolean,
     labelSize: TextUnit,
@@ -164,8 +163,15 @@ private fun MenuEntry(
                 modifier = Modifier.weight(1f).padding(vertical = padding),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                HudText(label, loud = true, color = Color(0xFF1A1206), fontSize = labelSize)
-                HudText(subtitle, color = Color(0xFF1A1206).copy(alpha = 0.75f), fontSize = subtitleSize)
+                // Near-white with a faint tint of the button's accent, outlined in a deep shade of it,
+                // like the title above.
+                OutlinedHudText(
+                    label,
+                    fontSize = labelSize,
+                    color = lerp(Color.White, accent, 0.18f),
+                    outline = lerp(accent, Color.Black, 0.62f),
+                )
+                if (subtitle != null) HudText(subtitle, color = lerp(accent, Color.Black, 0.72f), fontSize = subtitleSize)
             }
             Spacer(Modifier.width(emblemSize))
         }

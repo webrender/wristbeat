@@ -47,7 +47,7 @@ private fun routePriority(type: Int): Int = when (type) {
     else -> 0
 }
 
-private fun prefs() = WristbeatAndroid.appContext?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+internal fun prefs() = WristbeatAndroid.appContext?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
 internal actual fun loadCalibrationMs(outputId: String): Double? {
     val p = prefs() ?: return null

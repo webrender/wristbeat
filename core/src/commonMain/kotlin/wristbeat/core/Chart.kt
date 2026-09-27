@@ -40,6 +40,7 @@ enum class SoundId {
     PAN_FLUTE,
     PAD,
     CLAVE,
+    CLAP,
 }
 
 /**
@@ -87,6 +88,22 @@ object BongoBlitzSong {
     const val VERSE = 12.0
     const val CHORUS = 44.0
     const val BRIDGE = 76.0
+    const val OUTRO = 108.0
+
+    /** A few beats after [OUTRO]'s final hit, so it rings out before the results come up. */
+    const val END = 112.0
+}
+
+/**
+ * Remix 1's song form, in [REMIX_1_BPM] beats. Like a Rhythm Heaven remix, one new song runs
+ * straight through while the gameplay borrows earlier stages in turn, a third of the song (8
+ * bars) each: Snap Crabs from [CRABS], Mango Chop from [MANGO] and Bongo Blitz from [BONGO]. The
+ * intro's last bar is the stick count-in; the first crab call lands on [CRABS].
+ */
+object Remix1Song {
+    const val CRABS = 12.0
+    const val MANGO = 44.0
+    const val BONGO = 76.0
     const val OUTRO = 108.0
 
     /** A few beats after [OUTRO]'s final hit, so it rings out before the results come up. */
@@ -361,16 +378,16 @@ object Charts {
         return events.sortedBy { it.beat }
     }
 
-    /** One bar of a Bongo Blitz progression: the bass root and a pad/marimba voicing. */
-    private class BongoChord(val root: Double, val voicing: List<Double>)
+    /** One bar of a progression (Bongo Blitz's and Remix 1's): the bass root and a pad/marimba voicing. */
+    private class Chord(val root: Double, val voicing: List<Double>)
 
-    private val B_DM = BongoChord(38.0, listOf(62.0, 65.0, 69.0))
-    private val B_BB = BongoChord(34.0, listOf(62.0, 65.0, 70.0))
-    private val B_C = BongoChord(36.0, listOf(60.0, 64.0, 67.0))
-    private val B_GM = BongoChord(43.0, listOf(62.0, 67.0, 70.0))
-    private val B_A = BongoChord(33.0, listOf(61.0, 64.0, 69.0))
-    private val B_EB = BongoChord(39.0, listOf(63.0, 67.0, 70.0))
-    private val B_F = BongoChord(41.0, listOf(60.0, 65.0, 69.0))
+    private val B_DM = Chord(38.0, listOf(62.0, 65.0, 69.0))
+    private val B_BB = Chord(34.0, listOf(62.0, 65.0, 70.0))
+    private val B_C = Chord(36.0, listOf(60.0, 64.0, 67.0))
+    private val B_GM = Chord(43.0, listOf(62.0, 67.0, 70.0))
+    private val B_A = Chord(33.0, listOf(61.0, 64.0, 69.0))
+    private val B_EB = Chord(39.0, listOf(63.0, 67.0, 70.0))
+    private val B_F = Chord(41.0, listOf(60.0, 65.0, 69.0))
 
     /** One chord per bar, eight bars (four call-and-response pairs) per section. */
     private val BONGO_VERSE_CHORDS = listOf(B_DM, B_DM, B_BB, B_C, B_DM, B_DM, B_GM, B_A)
@@ -398,7 +415,7 @@ object Charts {
     )
 
     /** A 3-3-2 marimba figure through one bar of [chord]: root, fifth, octave, fifth, third, root. */
-    private fun marimbaBar(beat: Double, chord: BongoChord): List<ChartEvent> {
+    private fun marimbaBar(beat: Double, chord: Chord): List<ChartEvent> {
         // The chord's root in the marimba's 60–71 octave, with a minor or major third from the voicing.
         val root = 60.0 + (chord.root.toInt() % 12)
         val pitchClasses = chord.voicing.map { it.toInt() % 12 }
@@ -523,6 +540,193 @@ object Charts {
         }
         events += ChartEvent(outro, SoundId.MARIMBA, 62.0)
         events += ChartEvent(outro, SoundId.MARIMBA, 74.0)
+        return events.sortedBy { it.beat }
+    }
+
+    // Remix 1's chords: G major for the first two thirds, then up a whole step to A major for the
+    // Bongo Blitz third. D and E belong to both keys.
+    private val R_C = Chord(36.0, listOf(60.0, 64.0, 67.0))
+    private val R_D = Chord(38.0, listOf(62.0, 66.0, 69.0))
+    private val R_BM = Chord(35.0, listOf(59.0, 62.0, 66.0))
+    private val R_EM = Chord(40.0, listOf(59.0, 64.0, 67.0))
+    private val R_G = Chord(43.0, listOf(59.0, 62.0, 67.0))
+    private val R_E = Chord(40.0, listOf(59.0, 64.0, 68.0))
+    private val R_CSM = Chord(37.0, listOf(61.0, 64.0, 68.0))
+    private val R_FSM = Chord(42.0, listOf(61.0, 66.0, 69.0))
+    private val R_A = Chord(33.0, listOf(61.0, 64.0, 69.0))
+
+    /** IV–V–iii–vi, one chord per bar: the crab third in G, and the monkey third a step up in A. */
+    private val REMIX_CRAB_CHORDS = listOf(R_C, R_D, R_BM, R_EM)
+    private val REMIX_BONGO_CHORDS = listOf(R_D, R_E, R_CSM, R_FSM)
+
+    /** The mango third's IV–I–V–vi; its last bar swaps Em for E to pivot into A major. */
+    private val REMIX_MANGO_CHORDS = listOf(R_C, R_G, R_D, R_EM)
+
+    /**
+     * Remix 1's hook over [REMIX_CRAB_CHORDS]: (beat offset in an 8-bar pass, MIDI note), laid out
+     * like Bongo Blitz's hook — one note on each call bar's downbeat, where every call starts
+     * anyway, and the tune itself answering in the response bars. It comes back a step higher over
+     * [REMIX_BONGO_CHORDS] for the finale.
+     */
+    private val REMIX_HOOK: List<Pair<Double, Double>> = listOf(
+        0.0 to 76.0, 4.0 to 78.0, 4.5 to 79.0, 5.0 to 81.0, 6.0 to 79.0, 6.5 to 78.0, 7.0 to 74.0,
+        8.0 to 78.0, 12.0 to 79.0, 12.5 to 78.0, 13.0 to 76.0, 14.0 to 71.0, 14.5 to 74.0, 15.0 to 76.0,
+        16.0 to 79.0, 20.0 to 81.0, 20.5 to 83.0, 21.0 to 86.0, 22.0 to 83.0, 22.5 to 81.0, 23.0 to 78.0,
+        24.0 to 83.0, 28.0 to 79.0, 28.5 to 81.0, 29.0 to 83.0, 30.0 to 79.0, 31.0 to 76.0,
+    )
+
+    /**
+     * The mango third's steel pan theme over one 4-bar pass of [REMIX_MANGO_CHORDS]: (beat offset,
+     * MIDI note). Kept to 62–74 like Mango Chop's own pan line, under the toss whistles.
+     */
+    private val REMIX_MANGO_THEME: List<Pair<Double, Double>> = listOf(
+        0.0 to 64.0, 0.75 to 67.0, 1.5 to 72.0, 2.0 to 71.0, 2.5 to 72.0, 3.25 to 67.0,
+        4.0 to 71.0, 4.75 to 74.0, 5.5 to 71.0, 6.0 to 67.0, 6.5 to 62.0,
+        8.0 to 66.0, 8.75 to 69.0, 9.5 to 74.0, 10.0 to 72.0, 10.5 to 69.0, 11.25 to 66.0,
+        12.0 to 67.0, 12.75 to 71.0, 13.5 to 74.0, 14.0 to 71.0, 14.5 to 67.0, 15.25 to 64.0,
+    )
+
+    /**
+     * Remix 1's own song, a bright disco-pop tune at [REMIX_1_BPM] — one groove from start to end
+     * (four-on-the-floor kick, a clap backbeat and a new hook), recoloured for each stage it
+     * borrows, the way a Rhythm Heaven remix keeps its song but nods to each game's sound. Laid out
+     * by [Remix1Song]:
+     * - **Intro** — pad, bass and the hook's opening, then a bar of sticks over the kick to count in.
+     * - **Crabs** (call and response, in G) — call bars hold back to the steady kit and a pad chord so
+     *   the lead crab's snaps are the only syncopation; response bars add a bass run and keyboard
+     *   stabs, and the hook plays on top.
+     * - **Mangoes** (in G) — the kit trades its hats for Mango Chop's 16th-note shaker, over a disco
+     *   octave bass and offbeat keys; a steel pan theme joins after the first four bars. The last bar
+     *   turns Em into E and climbs up into the key change.
+     * - **Monkeys** (call and response, up a step in A) — Bongo Blitz's 3-3-2 marimba answers each
+     *   call, then the second half brings the hook's second half back on pan flute and marimba, a
+     *   step higher than before, with clave in the response bars.
+     * - **Outro** — a final A major hit with a crash and a pan flute run up the chord.
+     * Tom fills lead into each new third, and a crash marks it.
+     */
+    fun remix1Backing(): List<ChartEvent> {
+        val events = mutableListOf<ChartEvent>()
+        val crabs = Remix1Song.CRABS
+        val mango = Remix1Song.MANGO
+        val bongo = Remix1Song.BONGO
+        val outro = Remix1Song.OUTRO
+
+        // Intro: two bars (C, D) of pad, bass and hats under the hook's opening.
+        for ((bar, chord) in listOf(R_C, R_D).withIndex()) {
+            val b = bar * 4.0
+            for (note in chord.voicing) events += ChartEvent(b, SoundId.PAD, note)
+            events += ChartEvent(b, SoundId.BASS_LONG, chord.root)
+            events += ChartEvent(b + 2, SoundId.BASS_LONG, chord.root)
+            for (i in 0 until 8) events += ChartEvent(b + i * 0.5, SoundId.HAT)
+        }
+        for ((offset, note) in REMIX_HOOK) if (offset < 8.0) events += ChartEvent(offset, SoundId.MEL, note)
+        // Count-in bar: sticks over a four-on-the-floor kick on Em, the bass walking E–D down to C.
+        for (i in 8 until 12) {
+            events += ChartEvent(i.toDouble(), SoundId.STICK)
+            events += ChartEvent(i.toDouble(), SoundId.KICK)
+        }
+        for (note in R_EM.voicing) events += ChartEvent(8.0, SoundId.PAD, note)
+        events += ChartEvent(8.0, SoundId.BASS_LONG, R_EM.root)
+        events += ChartEvent(10.0, SoundId.BASS_LONG, R_D.root)
+
+        var b = crabs
+        while (b < outro) {
+            val inBongo = b >= bongo
+            val inMango = b >= mango && !inBongo
+            val sectionStart = when {
+                inBongo -> bongo
+                inMango -> mango
+                else -> crabs
+            }
+            val bar = ((b - sectionStart) / 4).toInt()
+            val secondHalf = bar >= 4
+            val lastBarOfSection = b + 4 == mango || b + 4 == bongo
+            val chord = when {
+                inBongo -> REMIX_BONGO_CHORDS[bar % 4]
+                inMango -> if (lastBarOfSection) R_E else REMIX_MANGO_CHORDS[bar % 4]
+                else -> REMIX_CRAB_CHORDS[bar % 4]
+            }
+
+            // Kit: a four-on-the-floor kick and a clap backbeat all the way through, with 8th-note
+            // hats — except in the mango third, which trades them for a 16th shaker and offbeat hats.
+            for (o in 0 until 4) events += ChartEvent(b + o, SoundId.KICK)
+            events += ChartEvent(b + 1, SoundId.CLAP)
+            if (!lastBarOfSection) events += ChartEvent(b + 3, SoundId.CLAP)
+            if (inMango) {
+                for (i in 0 until 16) if (i % 4 != 0) events += ChartEvent(b + i * 0.25, SoundId.SHAKER)
+                for (o in listOf(0.5, 1.5, 2.5, 3.5)) events += ChartEvent(b + o, SoundId.HAT)
+            } else {
+                for (i in 0 until 8) events += ChartEvent(b + i * 0.5, SoundId.HAT)
+            }
+
+            if (inMango) {
+                // Disco octave bass on every 8th, under offbeat keyboard stabs.
+                for (i in 0 until 8) {
+                    val sound = if (i % 4 == 0) SoundId.BASS_MED else SoundId.BASS_SHORT
+                    events += ChartEvent(b + i * 0.5, sound, chord.root + if (i % 2 == 1) 12.0 else 0.0)
+                }
+                for (o in listOf(0.5, 1.5, 2.5, 3.5)) for (note in chord.voicing) events += ChartEvent(b + o, SoundId.KEYS, note)
+            } else {
+                // Crab and monkey thirds: call bars hold a pad chord over a plain bass, and the band
+                // answers in the response bars — the same split Bongo Blitz uses.
+                val responseBar = bar % 2 == 1
+                for (note in chord.voicing) events += ChartEvent(b, SoundId.PAD, note)
+                if (responseBar) {
+                    events += ChartEvent(b, SoundId.BASS_MED, chord.root)
+                    events += ChartEvent(b + 1.5, SoundId.BASS_SHORT, chord.root + 12)
+                    events += ChartEvent(b + 2, SoundId.BASS_SHORT, chord.root + 7)
+                    events += ChartEvent(b + 3, SoundId.BASS_SHORT, chord.root + 12)
+                    events += ChartEvent(b + 3.5, SoundId.BASS_SHORT, chord.root + 7)
+                    when {
+                        !inBongo -> for (o in listOf(0.5, 1.5, 2.5, 3.5)) {
+                            for (note in chord.voicing) events += ChartEvent(b + o, SoundId.KEYS, note)
+                        }
+                        secondHalf -> for (o in listOf(0.0, 1.5, 3.0)) events += ChartEvent(b + o, SoundId.CLAVE)
+                        else -> events += marimbaBar(b, chord)
+                    }
+                } else {
+                    events += ChartEvent(b, SoundId.BASS_LONG, chord.root)
+                    events += ChartEvent(b + 2, SoundId.BASS_LONG, chord.root)
+                }
+            }
+            if (lastBarOfSection) events += tomFill(b + 3)
+            b += 4
+        }
+        for (crash in listOf(mango, mango + 16, bongo, bongo + 16)) events += ChartEvent(crash, SoundId.CRASH)
+
+        // The hook over the whole crab third.
+        for ((offset, note) in REMIX_HOOK) events += ChartEvent(crabs + offset, SoundId.MEL, note)
+
+        // The pan theme over the mango third's second half, handing its final bar to a climb up the
+        // E chord into the key change.
+        for ((offset, note) in REMIX_MANGO_THEME) {
+            val beat = mango + 16 + offset
+            if (beat < bongo - 4) events += ChartEvent(beat, SoundId.STEEL_PAN, note)
+        }
+        for ((i, note) in listOf(64.0, 68.0, 71.0, 76.0).withIndex()) {
+            events += ChartEvent(bongo - 3 + i * 0.5, SoundId.STEEL_PAN, note)
+        }
+
+        // The monkey third, a step up: the hook's call-bar downbeats on pan flute over the marimba's
+        // answers at first, then the hook's climactic second half on pan flute doubled by marimba an
+        // octave down.
+        for ((offset, note) in REMIX_HOOK) {
+            if (offset < 16.0) {
+                if (offset % 8.0 == 0.0) events += ChartEvent(bongo + offset, SoundId.PAN_FLUTE, note + 2)
+            } else {
+                events += ChartEvent(bongo + offset, SoundId.PAN_FLUTE, note + 2)
+                events += ChartEvent(bongo + offset, SoundId.MARIMBA, note + 2 - 12)
+            }
+        }
+
+        // Outro: the final A major hit, with the pad ringing under a flute run up the chord.
+        events += finalHit(outro, R_A.root)
+        for (note in R_A.voicing) events += ChartEvent(outro, SoundId.PAD, note)
+        for ((i, note) in listOf(69.0, 73.0, 76.0, 81.0, 85.0).withIndex()) {
+            events += ChartEvent(outro + i * 0.25, SoundId.PAN_FLUTE, note)
+        }
+        events += ChartEvent(outro, SoundId.MARIMBA, 57.0)
+        events += ChartEvent(outro, SoundId.MARIMBA, 69.0)
         return events.sortedBy { it.beat }
     }
 }

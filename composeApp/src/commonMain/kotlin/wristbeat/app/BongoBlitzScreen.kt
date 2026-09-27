@@ -33,7 +33,6 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.pow
-import kotlin.math.roundToInt
 import kotlin.math.sin
 import wristbeat.core.BongoBlitzStage
 import wristbeat.core.DrumAction
@@ -90,13 +89,11 @@ fun BongoBlitzScreen(
     var playerLoPulse by remember { mutableStateOf(0f) }
     var playerLoSwipeFlash by remember { mutableStateOf(0f) }
     var tally by remember { mutableStateOf(ScoreTally()) }
+    // How this run compared with the song's saved best, once it has finished.
+    var record by remember { mutableStateOf<RecordResult?>(null) }
     ReportRunning(started && !finished, onRunningChanged)
     // Highway: the player's upcoming response beats, dots for the high drum and swipe arrows for the low one.
-    val highwayTargets = remember(stage) {
-        stage.targets.map {
-            if (it.action == DrumAction.TAP) HighwayNote(it.beat, HI_NOTE_COLOR, 8f) else HighwayNote(it.beat, LO_NOTE_COLOR, 9f, NoteShape.SWIPE)
-        }
-    }
+    val highwayTargets = remember(stage) { stage.targets.map { bongoBlitzHighwayNote(it.beat, lowDrum = it.action == DrumAction.SWIPE) } }
 
     LaunchedEffect(started, finished) {
         var lastFrameMillis = 0L
@@ -144,7 +141,10 @@ fun BongoBlitzScreen(
             stage.updateMisses(rawBeat)
             tally = stage.tally()
 
-            if (stage.isFinished(beat)) finished = true
+            if (stage.isFinished(beat)) {
+                finished = true
+                record = submitScore(Stage.BONGO_BLITZ, tally.percent)
+            }
         }
     }
 
@@ -169,6 +169,7 @@ fun BongoBlitzScreen(
         playerLoPulse = 0f
         playerLoSwipeFlash = 0f
         tally = ScoreTally()
+        record = null
         finished = false
         started = true
     }
@@ -250,40 +251,22 @@ fun BongoBlitzScreen(
             },
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val squareExtent = minOf(size.width, size.height)
-            val squareLeft = (size.width - squareExtent) / 2f
-            val squareTop = (size.height - squareExtent) / 2f
-            val k = squareExtent / 400f
-
-            drawJungleBackground(squareLeft, squareTop, squareExtent, beatPosition)
-
-            if (chart.on) {
-                drawNoteHighway(
-                    targets = highwayTargets,
-                    beatPosition = beatPosition,
-                    // 3.7 beats at BONGO_BLITZ_BPM is about the same 1.29s look-ahead as Snap Crabs'
-                    // 2.5 beats at 116 BPM and Mango Chop's 3.0 at 140 BPM, so the scroll speed matches.
-                    lookaheadBeats = 3.7,
-                    hitFlash = maxOf(beatFlashPhase * 0.5f, targetPulsePhase),
-                    laneY = squareTop + 0.30f * squareExtent,
-                    laneLeftX = squareLeft + 0.20f * squareExtent,
-                    laneRightX = squareLeft + 0.92f * squareExtent,
-                )
-            }
-
-            withTransform({
-                translate(squareLeft, squareTop)
-                scale(k, k, Offset.Zero)
-            }) {
-                drawTorch(Offset(26f, 274f), beatPosition, seed = 0f)
-                drawTorch(Offset(374f, 274f), beatPosition, seed = 2.3f)
-                val bob = beatBob(beatPosition) * 4f
-                // The lead monkey calls from the left; the player's monkey answers on its own bongos
-                // on the right, the same lead/player pairing as Snap Crabs' two crabs.
-                drawDrummer(Offset(110f, 300f), LEAD_DRUMMER, leadHiPulse, leadLoPulse, leadLoPulse, bob, gaze = 1f)
-                drawDrummer(Offset(290f, 300f), PLAYER_DRUMMER, playerHiPulse, playerLoPulse, playerLoSwipeFlash, bob, gaze = -1f)
-            }
+            drawBongoBlitzScene(
+                beat = beatPosition,
+                leadHiPulse = leadHiPulse,
+                leadLoPulse = leadLoPulse,
+                playerHiPulse = playerHiPulse,
+                playerLoPulse = playerLoPulse,
+                playerLoSwipeFlash = playerLoSwipeFlash,
+                highway = highwayTargets.takeIf { chart.on },
+                // 3.7 beats at BONGO_BLITZ_BPM is about the same 1.29s look-ahead as Snap Crabs'
+                // 2.5 beats at 116 BPM and Mango Chop's 3.0 at 140 BPM, so the scroll speed matches.
+                lookaheadBeats = 3.7,
+                hitFlash = maxOf(beatFlashPhase * 0.5f, targetPulsePhase),
+            )
         }
+
+        StreakBadge(tally.streak, beat = { beatPosition }, visible = !finished)
 
         StageResults(
             visible = finished,
@@ -296,13 +279,67 @@ fun BongoBlitzScreen(
                 Rank.OK -> "OK"
                 Rank.TRY_AGAIN -> "Try again"
             },
-            heroValue = (tally.score * 100).roundToInt(),
+            heroValue = tally.percent,
             heroFormat = { "$it%" },
             stats = gradeStats(tally.perfect, tally.ok, tally.miss),
             passed = tally.rank != Rank.TRY_AGAIN,
+            record = record,
             onRestart = ::restart,
             onMenu = onMenu,
         )
+    }
+}
+
+/** A response note on the highway: a dot for the high drum, a swipe arrow for the low one. */
+internal fun bongoBlitzHighwayNote(beat: Double, lowDrum: Boolean): HighwayNote =
+    if (lowDrum) HighwayNote(beat, LO_NOTE_COLOR, 9f, NoteShape.SWIPE) else HighwayNote(beat, HI_NOTE_COLOR, 8f)
+
+/**
+ * The whole Bongo Blitz scene filling the canvas: the torchlit jungle, the note highway
+ * ([highway], or none when the chart is hidden), the torches and both monkeys at their bongos.
+ * Shared by [BongoBlitzScreen] and Remix 1's monkey third.
+ */
+internal fun DrawScope.drawBongoBlitzScene(
+    beat: Double,
+    leadHiPulse: Float,
+    leadLoPulse: Float,
+    playerHiPulse: Float,
+    playerLoPulse: Float,
+    playerLoSwipeFlash: Float,
+    highway: List<HighwayNote>?,
+    lookaheadBeats: Double,
+    hitFlash: Float,
+) {
+    val squareExtent = minOf(size.width, size.height)
+    val squareLeft = (size.width - squareExtent) / 2f
+    val squareTop = (size.height - squareExtent) / 2f
+    val k = squareExtent / 400f
+
+    drawJungleBackground(squareLeft, squareTop, squareExtent, beat)
+
+    if (highway != null) {
+        drawNoteHighway(
+            targets = highway,
+            beatPosition = beat,
+            lookaheadBeats = lookaheadBeats,
+            hitFlash = hitFlash,
+            laneY = squareTop + 0.30f * squareExtent,
+            laneLeftX = squareLeft + 0.20f * squareExtent,
+            laneRightX = squareLeft + 0.92f * squareExtent,
+        )
+    }
+
+    withTransform({
+        translate(squareLeft, squareTop)
+        scale(k, k, Offset.Zero)
+    }) {
+        drawTorch(Offset(26f, 274f), beat, seed = 0f)
+        drawTorch(Offset(374f, 274f), beat, seed = 2.3f)
+        val bob = beatBob(beat) * 4f
+        // The lead monkey calls from the left; the player's monkey answers on its own bongos
+        // on the right, the same lead/player pairing as Snap Crabs' two crabs.
+        drawDrummer(Offset(110f, 300f), LEAD_DRUMMER, leadHiPulse, leadLoPulse, leadLoPulse, bob, gaze = 1f)
+        drawDrummer(Offset(290f, 300f), PLAYER_DRUMMER, playerHiPulse, playerLoPulse, playerLoSwipeFlash, bob, gaze = -1f)
     }
 }
 

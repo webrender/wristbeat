@@ -85,4 +85,14 @@ class SnapCrabsStageTest {
         assertTrue(melodyBeats.count { it >= SnapCrabsSong.CHORUS && it < SnapCrabsSong.OUTRO } >
             melodyBeats.count { it >= SnapCrabsSong.VERSE && it < SnapCrabsSong.CHORUS })
     }
+
+    @Test fun perfectStreakBuildsAndAStrayTapBreaksIt() {
+        val stage = SnapCrabsStage()
+        for (target in stage.targets.take(6)) stage.recordTap(target)
+        assertEquals(6, stage.tally().streak)
+        // Half a beat off the next target is well outside the OK window: a stray.
+        assertNull(stage.recordTap(stage.targets[6] - 0.5)?.grade)
+        assertEquals(0, stage.tally().streak)
+        assertEquals(6, stage.tally().perfect)
+    }
 }

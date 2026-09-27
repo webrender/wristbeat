@@ -74,9 +74,7 @@ class MangoChopStage(inputOffsetMs: Double = 0.0) {
         (Charts.mangoChopBacking() + tosses.map { ChartEvent(it.beat, it.fruit.cue) }).sortedBy { it.beat }
 
     private val results = arrayOfNulls<TossResult>(tosses.size)
-    private var perfect = 0
-    private var ok = 0
-    private var miss = 0
+    private val score = Scorekeeper()
 
     fun resultOf(tossIndex: Int): TossResult? = results[tossIndex]
 
@@ -93,7 +91,11 @@ class MangoChopStage(inputOffsetMs: Double = 0.0) {
             ?.let { tosses[it].fruit.action }
     }
 
-    fun recordAction(action: ChopAction, rawBeat: Double): ChopOutcome {
+    /** Judges [action]; a stray (nothing matching in reach) or a grade short of Perfect breaks the Perfect streak. */
+    fun recordAction(action: ChopAction, rawBeat: Double): ChopOutcome =
+        matchAction(action, rawBeat).also { if (it.grade == null) score.stray() }
+
+    private fun matchAction(action: ChopAction, rawBeat: Double): ChopOutcome {
         val beat = rawBeat - offsetBeats
         val index = tosses.indices
             .filter { results[it] == null && tosses[it].fruit.action == action }
@@ -102,7 +104,7 @@ class MangoChopStage(inputOffsetMs: Double = 0.0) {
         val errorMs = (beat - tosses[index].landBeat) * secondsPerBeat * 1000.0
         val grade = judge(errorMs) ?: return ChopOutcome(null, errorMs, null)
         results[index] = TossResult(grade, beat)
-        if (grade == Grade.PERFECT) perfect++ else ok++
+        score.hit(grade)
         return ChopOutcome(grade, errorMs, index)
     }
 
@@ -113,7 +115,7 @@ class MangoChopStage(inputOffsetMs: Double = 0.0) {
         for (i in tosses.indices) {
             if (results[i] == null && isMissed(beat, tosses[i].landBeat, secondsPerBeat)) {
                 results[i] = TossResult(null, beat)
-                miss++
+                score.miss()
                 newlyMissed += i
             }
         }
@@ -125,5 +127,5 @@ class MangoChopStage(inputOffsetMs: Double = 0.0) {
 
     fun isFinished(currentBeat: Double): Boolean = currentBeat >= end
 
-    fun tally(): ScoreTally = ScoreTally(perfect, ok, miss)
+    fun tally(): ScoreTally = score.tally()
 }

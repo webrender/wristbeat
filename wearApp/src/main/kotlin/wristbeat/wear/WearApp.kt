@@ -116,6 +116,7 @@ private fun StageMenu(
                                     Stage.SNAP_CRABS -> "Repeat the lead crab"
                                     Stage.MANGO_CHOP -> "Tap to chop, swipe to slice"
                                     Stage.BONGO_BLITZ -> "Copy the monkey's beat"
+                                    Stage.REMIX_1 -> "All three, one new song"
                                 },
                             )
                         },

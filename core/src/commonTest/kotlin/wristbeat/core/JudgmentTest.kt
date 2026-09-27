@@ -29,6 +29,34 @@ class JudgmentTest {
         assertEquals(Rank.TRY_AGAIN, ScoreTally(perfect = 5, ok = 0, miss = 5).rank) // 0.5
     }
 
+    @Test fun scorekeeperCountsBackToBackPerfectsAsAStreak() {
+        val score = Scorekeeper()
+        repeat(6) { score.hit(Grade.PERFECT) }
+        assertEquals(ScoreTally(perfect = 6, streak = 6), score.tally())
+    }
+
+    @Test fun anythingShortOfPerfectBreaksTheStreakAndItRestartsFromZero() {
+        for (breaker in listOf<(Scorekeeper) -> Unit>({ it.hit(Grade.OK) }, { it.miss() }, { it.stray() })) {
+            val score = Scorekeeper()
+            repeat(7) { score.hit(Grade.PERFECT) }
+            breaker(score)
+            assertEquals(0, score.tally().streak)
+            score.hit(Grade.PERFECT)
+            assertEquals(1, score.tally().streak)
+        }
+    }
+
+    @Test fun aStrayScoresNothing() {
+        val score = Scorekeeper()
+        score.stray()
+        assertEquals(ScoreTally(), score.tally())
+    }
+
+    @Test fun percentRoundsTheScore() {
+        assertEquals(67, ScoreTally(perfect = 2, miss = 1).percent)
+        assertEquals(0, ScoreTally().percent)
+    }
+
     @Test fun medianOddCount() = assertEquals(2.0, median(listOf(3.0, 1.0, 2.0)))
     @Test fun medianEvenCount() = assertEquals(2.5, median(listOf(1.0, 2.0, 3.0, 4.0)))
     @Test fun medianEmpty() = assertEquals(0.0, median(emptyList()))

@@ -30,7 +30,6 @@ import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.pow
-import kotlin.math.roundToInt
 import kotlin.math.sin
 import wristbeat.core.Grade
 import wristbeat.core.Rank
@@ -70,8 +69,10 @@ fun SnapCrabsScreen(
     var targetPulsePhase by remember { mutableStateOf(0f) }
     var playerPulsePhase by remember { mutableStateOf(0f) }
     var tally by remember { mutableStateOf(ScoreTally()) }
+    // How this run compared with the song's saved best, once it has finished.
+    var record by remember { mutableStateOf<RecordResult?>(null) }
     ReportRunning(started && !finished, onRunningChanged)
-    val highwayTargets = remember(stage) { stage.targets.map { HighwayNote(it, Color(0xFF6FB6FF), 8f) } }
+    val highwayTargets = remember(stage) { stage.targets.map(::snapCrabsHighwayNote) }
 
     LaunchedEffect(started, finished) {
         var lastFrameMillis = 0L
@@ -117,7 +118,10 @@ fun SnapCrabsScreen(
             stage.updateMisses(rawBeat)
             tally = stage.tally()
 
-            if (stage.isFinished(beat)) finished = true
+            if (stage.isFinished(beat)) {
+                finished = true
+                record = submitScore(Stage.SNAP_CRABS, tally.percent)
+            }
         }
     }
 
@@ -134,6 +138,7 @@ fun SnapCrabsScreen(
         nextTargetIndex = 0
         targetPulsePhase = 0f
         tally = ScoreTally()
+        record = null
         finished = false
         started = true
     }
@@ -171,36 +176,17 @@ fun SnapCrabsScreen(
             .pointerInput(Unit) { detectTapGestures(onPress = { handleTap() }) },
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val squareExtent = minOf(size.width, size.height)
-            val squareLeft = (size.width - squareExtent) / 2f
-            val squareTop = (size.height - squareExtent) / 2f
-            val k = squareExtent / 400f
-
-            drawBeachBackground(squareLeft, squareTop, squareExtent, beatPosition)
-
-            if (chart.on) {
-                drawNoteHighway(
-                    targets = highwayTargets,
-                    beatPosition = beatPosition,
-                    lookaheadBeats = 2.5,
-                    hitFlash = maxOf(beatFlashPhase * 0.5f, targetPulsePhase),
-                    laneY = squareTop + 0.30f * squareExtent,
-                    laneLeftX = squareLeft + 0.20f * squareExtent,
-                    laneRightX = squareLeft + 0.92f * squareExtent,
-                )
-            }
-
-            // The crabs are authored in the stage's 400×400 logical space, like the other stages.
-            withTransform({
-                translate(squareLeft, squareTop)
-                scale(k, k, Offset.Zero)
-            }) {
-                val bob = beatBob(beatPosition) * 7f
-                // They face each other: the lead crab calls from the left, the player answers on the right.
-                drawCrab(Offset(112f, 268f), 1.13f, LEAD_CRAB, leadPulsePhase, bob, gaze = 1f)
-                drawCrab(Offset(288f, 268f), 1.13f, PLAYER_CRAB, playerPulsePhase, bob, gaze = -1f)
-            }
+            drawSnapCrabsScene(
+                beat = beatPosition,
+                leadPulse = leadPulsePhase,
+                playerPulse = playerPulsePhase,
+                highway = highwayTargets.takeIf { chart.on },
+                lookaheadBeats = 2.5,
+                hitFlash = maxOf(beatFlashPhase * 0.5f, targetPulsePhase),
+            )
         }
+
+        StreakBadge(tally.streak, beat = { beatPosition }, visible = !finished)
 
         StageResults(
             visible = finished,
@@ -213,13 +199,61 @@ fun SnapCrabsScreen(
                 Rank.OK -> "OK"
                 Rank.TRY_AGAIN -> "Try again"
             },
-            heroValue = (tally.score * 100).roundToInt(),
+            heroValue = tally.percent,
             heroFormat = { "$it%" },
             stats = gradeStats(tally.perfect, tally.ok, tally.miss),
             passed = tally.rank != Rank.TRY_AGAIN,
+            record = record,
             onRestart = ::restart,
             onMenu = onMenu,
         )
+    }
+}
+
+/** A crab target on the note highway. */
+internal fun snapCrabsHighwayNote(beat: Double) = HighwayNote(beat, Color(0xFF6FB6FF), 8f)
+
+/**
+ * The whole Snap Crabs scene filling the canvas: the beach, the note highway ([highway], or none
+ * when the chart is hidden) and both crabs. Shared by [SnapCrabsScreen] and Remix 1's crab third,
+ * which is why the highway's look-ahead is passed in (it depends on the tempo).
+ */
+internal fun DrawScope.drawSnapCrabsScene(
+    beat: Double,
+    leadPulse: Float,
+    playerPulse: Float,
+    highway: List<HighwayNote>?,
+    lookaheadBeats: Double,
+    hitFlash: Float,
+) {
+    val squareExtent = minOf(size.width, size.height)
+    val squareLeft = (size.width - squareExtent) / 2f
+    val squareTop = (size.height - squareExtent) / 2f
+    val k = squareExtent / 400f
+
+    drawBeachBackground(squareLeft, squareTop, squareExtent, beat)
+
+    if (highway != null) {
+        drawNoteHighway(
+            targets = highway,
+            beatPosition = beat,
+            lookaheadBeats = lookaheadBeats,
+            hitFlash = hitFlash,
+            laneY = squareTop + 0.30f * squareExtent,
+            laneLeftX = squareLeft + 0.20f * squareExtent,
+            laneRightX = squareLeft + 0.92f * squareExtent,
+        )
+    }
+
+    // The crabs are authored in the stage's 400×400 logical space, like the other stages.
+    withTransform({
+        translate(squareLeft, squareTop)
+        scale(k, k, Offset.Zero)
+    }) {
+        val bob = beatBob(beat) * 7f
+        // They face each other: the lead crab calls from the left, the player answers on the right.
+        drawCrab(Offset(112f, 268f), 1.13f, LEAD_CRAB, leadPulse, bob, gaze = 1f)
+        drawCrab(Offset(288f, 268f), 1.13f, PLAYER_CRAB, playerPulse, bob, gaze = -1f)
     }
 }
 

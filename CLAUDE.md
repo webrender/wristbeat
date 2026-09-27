@@ -36,8 +36,10 @@ build and launch the shared `App()`), but their platform actuals are placeholder
     Mango Chop and Bongo Blitz) marked by crashes and tom/rim fills, and an outro that lands on a
     final chord and rings out before the results. Stages place their gameplay on those sections
     (Snap Crabs' easy patterns in the verse, harder ones in the chorus; Mango Chop's pineapples and
-    Bongo Blitz's low-drum swipes both arrive with the bridge).
-  - `CalibrateStage.kt`, `SnapCrabsStage.kt`, `MangoChopStage.kt`, `BongoBlitzStage.kt` — per-stage
+    Bongo Blitz's low-drum swipes both arrive with the bridge). `remix1Backing` is Remix 1's song
+    (see **Remix 1** below), laid out by `Remix1Song`, with its own `CLAP` voice for the backbeat.
+  - `CalibrateStage.kt`, `SnapCrabsStage.kt`, `MangoChopStage.kt`, `BongoBlitzStage.kt`,
+    `Remix1Stage.kt` — per-stage
     state machines (`recordTap`/`recordAction`, `updateMisses`, `tally`, and `perceivedBeat`, which
     the screens draw at so visuals follow the calibrated offset).
 - **`composeApp/`** — the Compose UI and platform adapters.
@@ -45,7 +47,9 @@ build and launch the shared `App()`), but their platform actuals are placeholder
     declaration for the back gesture that returns to the menu),
     `MainMenu.kt` (the phone/web home screen: pick a stage, toggle the chart, see the calibration
     offset — the mobile/web counterpart to `wearApp`'s native menu), `CalibrateScreen.kt`,
-    `SnapCrabsScreen.kt`, `MangoChopScreen.kt`, `BongoBlitzScreen.kt`,
+    `SnapCrabsScreen.kt`, `MangoChopScreen.kt`, `BongoBlitzScreen.kt` (each also exposes its whole
+    scene as `drawSnapCrabsScene`/`drawMangoChopScene`/`drawBongoBlitzScene`, which Remix 1 reuses),
+    `Remix1Screen.kt`,
     `Hud.kt` (shared HUD text/chip styling), `StageHud.kt` (shared HUD bits: the chart toggle,
     `ReportRunning`), `Results.kt` (`StageResults`, the fullscreen wipe-and-count-up screen a run
     transitions into when it ends, playing a cheer/boo sound), `NoteHighway.kt` (the shared note
@@ -79,7 +83,7 @@ into the same timebase before judging, per HANDOFF's timing-accuracy requirement
 ## Current status (playable today, on web)
 
 - **Main menu** (`MainMenu.kt`) — the app opens on a menu, not straight into a stage: pick Calibrate,
-  Snap Crabs, Mango Chop or Bongo Blitz, or toggle the note highway ("chart") on/off, mirroring the native menu
+  Snap Crabs, Mango Chop, Bongo Blitz or Remix 1, or toggle the note highway ("chart") on/off, mirroring the native menu
   `wearApp` already had on the watch. A stage is full-bleed game with no title, tap/swipe
   instructions, or top HUD chrome of its own while it's being played (a tutorial stage will cover
   that explanation later), and its song starts automatically the moment it opens — no tap needed.
@@ -114,7 +118,29 @@ into the same timebase before judging, per HANDOFF's timing-accuracy requirement
   wrong drum is a stray, same as Mango Chop's wrong action: it consumes nothing and can be corrected
   inside the window. Its note highway shows the upcoming response beats (dots for the high drum,
   swipe arrows for the low one), and hides with the same chart toggle.
-- **Results** (`Results.kt`) — Snap Crabs, Mango Chop and Bongo Blitz no longer show a live Perfect/OK/Miss tally
+- **Remix 1** (`Remix1Stage.kt`, `Remix1Screen.kt`) — like a Rhythm Heaven remix: one new song
+  (`Charts.remix1Backing`, a disco-pop tune at 128 BPM with a four-on-the-floor kick and clap
+  backbeat) runs straight through while the gameplay borrows Snap Crabs, then Mango Chop, then Bongo
+  Blitz, 8 bars (a third of the song, ~53s in all) each, drawn with each stage's own scene and played by its
+  rules and cues, with all-new patterns/tosses. The song follows the stages: the crab third is in G
+  with the hook; the mango third swaps to Mango Chop's shaker and a steel pan theme; the monkey third
+  modulates up to A with Bongo Blitz's marimba and brings the hook back a step higher. Over the last
+  beat of each third a slanted inked band in the next stage's accent wipes the next scene in
+  (`drawWipe`). Inputs are a unified tap/swipe (`RemixAction`), judged like Bongo Blitz (the wrong
+  action is a stray); the crab third ignores swipes. `Remix1StageTest` checks each third's targets
+  stay in their scene and finish before the wipe, and the same spacing/swipe rules as Bongo Blitz.
+- **Perfect streak** (`Streak.kt`'s `StreakBadge`) — every scored stage counts back-to-back Perfects
+  (`Judgment.kt`'s `Scorekeeper`, shared by all four stages; `ScoreTally.streak`). Anything short of
+  a Perfect — an OK, a miss, or a stray input (a whiff, or the wrong action) — resets it. Once it's
+  above 5, a gold inked starburst with the count over a red "Streak" ribbon pops in at the top of
+  the stage square. It throbs on every beat and pops with a spark ring on each further Perfect. It
+  disappears the moment the streak breaks, and the next streak starts it over from 6.
+- **Records** (`Records.kt`) — each scored stage's best score (the results percentage) is saved by
+  `Stage.name`, in `localStorage` on the web and `SharedPreferences` on Android, alongside the
+  calibration. `submitScore` runs when a song ends. The results screen then shows a wobbling gold
+  "New record!" badge with a chime once the count-up lands (a first finish with a score above zero
+  counts), or the standing "Best N%" otherwise.
+- **Results** (`Results.kt`) — Snap Crabs, Mango Chop, Bongo Blitz and Remix 1 no longer show a live Perfect/OK/Miss tally
   or rank during play; instead, once the song ends, an accent-colored panel wipes fully across the
   screen (`StageResults`'s `wipe` `Animatable`, sliding off to reveal what's behind it), replacing
   the frozen game with an opaque fullscreen backdrop — a radial gradient plus a slow-turning
@@ -170,7 +196,10 @@ into the same timebase before judging, per HANDOFF's timing-accuracy requirement
     move on `beatPosition`, never a separate clock). Characters react to their cues (mouths
     open, sparks/bursts on hits). The note highway (`NoteHighway.kt`) follows suit: an inked
     track, scrolling beat ticks, a hit ring, and outlined glossy note gems. The main menu shows
-    each stage's own art as an animated emblem (`drawSnapCrabsEmblem` etc.) beside its entry.
+    each stage's own art as an animated emblem (`drawSnapCrabsEmblem` etc.; Remix 1's is a
+    bouncing inked "1") beside its entry. Entry titles are near-white with a faint tint of the
+    button's accent, outlined in a deep shade of it (`OutlinedHudText`); only Calibrate has a
+    subtitle (its saved offset).
   - Text goes through `Hud.kt`'s `HudText`/`HudChip`, not plain Material `Text`, so it reads as
     game HUD copy: shadowed, letter-spaced, all-caps, and set in **Sniglet** (OFL-licensed, see
     `THIRD_PARTY_LICENSES/sniglet-OFL.txt`), a bubbly rounded display face loaded via Compose

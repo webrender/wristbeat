@@ -74,6 +74,10 @@ internal fun gradeStats(perfect: Int, ok: Int, miss: Int): List<StatCounter> = l
  * [onMenu] is given) "Menu" underneath. [passed] sets the mood: confetti rains down on a pass, a
  * gloomy drizzle falls on a fail, and null (Calibrate, which isn't scored pass/fail) has neither.
  * Plays [sound] once as the wipe starts.
+ *
+ * [record] (scored stages only) is how the run compared with the song's saved best: once the
+ * count-up lands, a new record bursts in as a wobbling gold "New record!" badge with a chime, and
+ * otherwise the standing best is shown underneath the score.
  */
 @Composable
 internal fun BoxScope.StageResults(
@@ -87,6 +91,7 @@ internal fun BoxScope.StageResults(
     heroFormat: (Int) -> String = { it.toString() },
     stats: List<StatCounter> = emptyList(),
     passed: Boolean? = null,
+    record: RecordResult? = null,
     onRestart: () -> Unit,
     onMenu: (() -> Unit)? = null,
 ) {
@@ -97,6 +102,7 @@ internal fun BoxScope.StageResults(
     val bounce = remember { Animatable(0.6f) }
     val stamp = remember { Animatable(2.2f) }
     val count = remember { Animatable(0f) }
+    val recordIn = remember { Animatable(0f) }
     var elapsed by remember { mutableStateOf(0f) }
 
     LaunchedEffect(Unit) {
@@ -113,6 +119,14 @@ internal fun BoxScope.StageResults(
             while (true) elapsed = (withFrameMillis { it } - start) / 1000f
         }
         count.animateTo(1f, tween(1100, easing = FastOutSlowInEasing))
+        if (record?.isNew == true) {
+            val now = audioClock.now()
+            audioEngine.play(SoundId.PERFECT_DING, now)
+            audioEngine.play(SoundId.PERFECT_DING, now + 0.12)
+            recordIn.animateTo(1f, spring(dampingRatio = 0.4f, stiffness = 500f))
+        } else {
+            recordIn.animateTo(1f, tween(250))
+        }
     }
 
     val infinite = rememberInfiniteTransition(label = "results-burst")
@@ -140,6 +154,7 @@ internal fun BoxScope.StageResults(
         val heroSize = if (watch) 34.sp else (minDim * 0.2f).sp
         val statSize = if (watch) 14.sp else (minDim * 0.07f).sp
         val statLabelSize = if (watch) 9.sp else (minDim * 0.03f).sp
+        val recordSize = if (watch) 12.sp else (minDim * 0.05f).sp
         val buttonTextSize = if (watch) 13.sp else (minDim * 0.045f).sp
         val buttonPadding = if (watch) 0.dp else (minDim * 0.02f).dp
         val gapTiny = if (watch) 2.dp else (minDim * 0.012f).dp
@@ -189,6 +204,33 @@ internal fun BoxScope.StageResults(
             if (hero.isNotEmpty()) {
                 Spacer(Modifier.height(gapTiny))
                 OutlinedHudText(hero, fontSize = heroSize, color = lerp(accent, Color.White, 0.15f))
+            }
+            if (record != null) {
+                Spacer(Modifier.height(gapTiny))
+                if (record.isNew) {
+                    // A gold badge that springs in once the count lands, then keeps wobbling.
+                    HudChip(
+                        accent = Color(0xFFFFB627),
+                        modifier = Modifier.graphicsLayer {
+                            val pop = recordIn.value
+                            scaleX = pop * (1f + 0.04f * sin(elapsed * 7f))
+                            scaleY = pop * (1f + 0.04f * sin(elapsed * 7f))
+                            rotationZ = 4f * sin(elapsed * 3.5f)
+                            alpha = pop.coerceIn(0f, 1f)
+                        },
+                    ) {
+                        Box(Modifier.padding(horizontal = gapSmall, vertical = gapTiny)) {
+                            OutlinedHudText("New record!", fontSize = recordSize, color = Color(0xFFFFFBE8), outline = Color(0xFF5A2A00))
+                        }
+                    }
+                } else {
+                    HudText(
+                        "Best ${record.best}%",
+                        color = lerp(accent, Color.White, 0.55f),
+                        fontSize = statLabelSize * 1.4f,
+                        modifier = Modifier.graphicsLayer { alpha = recordIn.value },
+                    )
+                }
             }
             if (stats.isNotEmpty()) {
                 Spacer(Modifier.height(gapSmall))

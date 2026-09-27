@@ -38,7 +38,6 @@ import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.exp
 import kotlin.math.floor
-import kotlin.math.roundToInt
 import kotlin.math.sin
 import wristbeat.core.ChopAction
 import wristbeat.core.Fruit
@@ -95,10 +94,12 @@ fun MangoChopScreen(
     var slashAngle by remember { mutableStateOf(0f) }
     var keySlashFlip by remember { mutableStateOf(false) }
     var tally by remember { mutableStateOf(ScoreTally()) }
+    // How this run compared with the song's saved best, once it has finished.
+    var record by remember { mutableStateOf<RecordResult?>(null) }
     ReportRunning(started && !finished, onRunningChanged)
     // Highway: each toss's landing (the beat to act on). Pineapples are swipe arrows, since they
     // take a swipe rather than a tap.
-    val highwayTargets = remember(stage) { stage.tosses.map { highwayNote(it.fruit, it.landBeat) } }
+    val highwayTargets = remember(stage) { stage.tosses.map { mangoChopHighwayNote(it.fruit, it.landBeat) } }
 
     LaunchedEffect(started, finished) {
         var lastFrameMillis = 0L
@@ -127,7 +128,10 @@ fun MangoChopScreen(
             if (stage.updateMisses(rawBeat).isNotEmpty()) audioEngine.play(SoundId.THUD, now)
             tally = stage.tally()
 
-            if (stage.isFinished(beat)) finished = true
+            if (stage.isFinished(beat)) {
+                finished = true
+                record = submitScore(Stage.MANGO_CHOP, tally.percent)
+            }
         }
     }
 
@@ -144,6 +148,7 @@ fun MangoChopScreen(
         sinceChop = 10f
         sinceSlash = 10f
         tally = ScoreTally()
+        record = null
         finished = false
         started = true
     }
@@ -232,46 +237,22 @@ fun MangoChopScreen(
             },
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val squareExtent = minOf(size.width, size.height)
-            val squareLeft = (size.width - squareExtent) / 2f
-            val squareTop = (size.height - squareExtent) / 2f
-            val k = squareExtent / 400f
-
-            drawMarketBackground(squareLeft, squareTop, squareExtent, beatPosition)
-
-            if (chart.on) {
-                drawNoteHighway(
-                    targets = highwayTargets,
-                    beatPosition = beatPosition,
-                    // Same scroll speed as Snap Crabs' 2.5 beats at 116 BPM.
-                    lookaheadBeats = 3.0,
-                    hitFlash = highwayFlash(beatPosition, stage.tosses, secondsPerBeat),
-                    laneY = squareTop + 0.36f * squareExtent,
-                    laneLeftX = squareLeft + 0.20f * squareExtent,
-                    laneRightX = squareLeft + 0.92f * squareExtent,
-                )
-            }
-
-            // Everything interactive is authored in the prototype's 400×400 logical stage.
-            withTransform({
-                translate(squareLeft, squareTop)
-                scale(k, k, Offset.Zero)
-            }) {
-                drawBoard()
-                if (started) {
-                    for ((i, toss) in stage.tosses.withIndex()) {
-                        if (beatPosition < toss.beat) break
-                        drawToss(toss.fruit, toss.beat, toss.landBeat, stage.resultOf(i), beatPosition, secondsPerBeat)
-                    }
-                } else {
-                    drawFruit(Fruit.MANGO, Offset(150f, BOARD_Y), 0.2f)
-                    drawFruit(Fruit.LIME, Offset(205f, BOARD_Y + 4f), 0f)
-                    drawFruit(Fruit.PINEAPPLE, Offset(252f, BOARD_Y - 6f), -0.1f)
-                }
-                drawSlash(sinceSlash, slashAngle)
-                drawCleaver(sinceChop)
-            }
+            drawMangoChopScene(
+                beat = beatPosition,
+                tosses = stage.tosses,
+                resultOf = stage::resultOf,
+                secondsPerBeat = secondsPerBeat,
+                started = started,
+                sinceChop = sinceChop,
+                sinceSlash = sinceSlash,
+                slashAngle = slashAngle,
+                highway = highwayTargets.takeIf { chart.on },
+                // Same scroll speed as Snap Crabs' 2.5 beats at 116 BPM.
+                lookaheadBeats = 3.0,
+            )
         }
+
+        StreakBadge(tally.streak, beat = { beatPosition }, visible = !finished)
 
         StageResults(
             visible = finished,
@@ -284,17 +265,78 @@ fun MangoChopScreen(
                 Rank.OK -> "OK"
                 Rank.TRY_AGAIN -> "Try again"
             },
-            heroValue = (tally.score * 100).roundToInt(),
+            heroValue = tally.percent,
             heroFormat = { "$it%" },
             stats = gradeStats(tally.perfect, tally.ok, tally.miss),
             passed = tally.rank != Rank.TRY_AGAIN,
+            record = record,
             onRestart = ::restart,
             onMenu = onMenu,
         )
     }
 }
 
-private fun highwayNote(fruit: Fruit, beat: Double): HighwayNote {
+/**
+ * The whole Mango Chop scene filling the canvas: the market stall, the note highway ([highway], or
+ * none when the chart is hidden), the board, every toss so far (flying in, cut, or bouncing off per
+ * [resultOf], indexed like [tosses]), and the player's slash and cleaver. Shared by
+ * [MangoChopScreen] and Remix 1's mango third; before a run has [started] the board shows one of
+ * each fruit instead.
+ */
+internal fun DrawScope.drawMangoChopScene(
+    beat: Double,
+    tosses: List<Toss>,
+    resultOf: (Int) -> TossResult?,
+    secondsPerBeat: Double,
+    started: Boolean,
+    sinceChop: Float,
+    sinceSlash: Float,
+    slashAngle: Float,
+    highway: List<HighwayNote>?,
+    lookaheadBeats: Double,
+) {
+    val squareExtent = minOf(size.width, size.height)
+    val squareLeft = (size.width - squareExtent) / 2f
+    val squareTop = (size.height - squareExtent) / 2f
+    val k = squareExtent / 400f
+
+    drawMarketBackground(squareLeft, squareTop, squareExtent, beat)
+
+    if (highway != null) {
+        drawNoteHighway(
+            targets = highway,
+            beatPosition = beat,
+            lookaheadBeats = lookaheadBeats,
+            hitFlash = highwayFlash(beat, tosses, secondsPerBeat),
+            laneY = squareTop + 0.36f * squareExtent,
+            laneLeftX = squareLeft + 0.20f * squareExtent,
+            laneRightX = squareLeft + 0.92f * squareExtent,
+        )
+    }
+
+    // Everything interactive is authored in the prototype's 400×400 logical stage.
+    withTransform({
+        translate(squareLeft, squareTop)
+        scale(k, k, Offset.Zero)
+    }) {
+        drawBoard()
+        if (started) {
+            for ((i, toss) in tosses.withIndex()) {
+                if (beat < toss.beat) break
+                drawToss(toss.fruit, toss.beat, toss.landBeat, resultOf(i), beat, secondsPerBeat)
+            }
+        } else {
+            drawFruit(Fruit.MANGO, Offset(150f, BOARD_Y), 0.2f)
+            drawFruit(Fruit.LIME, Offset(205f, BOARD_Y + 4f), 0f)
+            drawFruit(Fruit.PINEAPPLE, Offset(252f, BOARD_Y - 6f), -0.1f)
+        }
+        drawSlash(sinceSlash, slashAngle)
+        drawCleaver(sinceChop)
+    }
+}
+
+/** A fruit's landing on the note highway: a dot to chop, or a swipe arrow for a pineapple's slice. */
+internal fun mangoChopHighwayNote(fruit: Fruit, beat: Double): HighwayNote {
     val color = when (fruit) {
         Fruit.MANGO -> Color(0xFFFFB320)
         Fruit.LIME -> Color(0xFF86C537)

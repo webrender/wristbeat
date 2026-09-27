@@ -130,6 +130,10 @@ actual class AudioEngine actual constructor() {
             }
             SoundId.PAD -> osc(Wave.TRIANGLE, mtof(param), t, 0.09, 0.028, 1.1)
             SoundId.CLAVE -> osc(Wave.SINE, 2500.0, t, 0.001, 0.12, 0.035)
+            SoundId.CLAP -> {
+                for (i in 0 until 3) noise(t + i * 0.011, 0.012, 0.2, FilterType.BANDPASS, 1150.0, 1.2)
+                noise(t + 0.033, 0.11, 0.16, FilterType.BANDPASS, 1050.0, 0.9)
+            }
         }
     }
 }

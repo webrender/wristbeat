@@ -150,6 +150,12 @@ actual class AudioEngine actual constructor() {
             SoundId.PAD -> jsOsc(ctx, "triangle", mtof(param), atSeconds, 0.09, 0.028, 1.1)
             // A high wooden click, well above the bongos so it never reads as a call.
             SoundId.CLAVE -> jsOsc(ctx, "sine", 2500.0, atSeconds, 0.001, 0.12, 0.035)
+            // Remix 1's backbeat: three quick noise slaps ~11ms apart (several hands, not quite
+            // together) and a short room tail, kept to a moderate level under the cues.
+            SoundId.CLAP -> {
+                for (i in 0 until 3) jsNoise(ctx, noise, atSeconds + i * 0.011, 0.012, 0.2, "bandpass", 1150.0, 1.2)
+                jsNoise(ctx, noise, atSeconds + 0.033, 0.11, 0.16, "bandpass", 1050.0, 0.9)
+            }
         }
     }
 }

@@ -58,12 +58,16 @@ class SnapCrabsStage(inputOffsetMs: Double = 0.0) {
     }
 
     private val judged = BooleanArray(targets.size)
-    private var perfect = 0
-    private var ok = 0
-    private var miss = 0
+    private val score = Scorekeeper()
 
-    /** Matches [beat] to the nearest un-judged target and grades it. Null means a stray tap (no grade, nothing consumed). */
-    fun recordTap(rawBeat: Double): TapOutcome? {
+    /**
+     * Matches [beat] to the nearest un-judged target and grades it. Null means a stray tap (no
+     * grade, nothing consumed); a stray, or a grade short of Perfect, breaks the Perfect streak.
+     */
+    fun recordTap(rawBeat: Double): TapOutcome? =
+        matchTap(rawBeat).also { if (it?.grade == null) score.stray() }
+
+    private fun matchTap(rawBeat: Double): TapOutcome? {
         val beat = rawBeat - offsetBeats
         var bestIndex = -1
         var bestDelta = Double.MAX_VALUE
@@ -79,7 +83,7 @@ class SnapCrabsStage(inputOffsetMs: Double = 0.0) {
         val errorMs = (beat - targets[bestIndex]) * SECONDS_PER_BEAT * 1000.0
         val grade = judge(errorMs) ?: return TapOutcome(null, errorMs)
         judged[bestIndex] = true
-        if (grade == Grade.PERFECT) perfect++ else ok++
+        score.hit(grade)
         return TapOutcome(grade, errorMs)
     }
 
@@ -89,7 +93,7 @@ class SnapCrabsStage(inputOffsetMs: Double = 0.0) {
         for (i in targets.indices) {
             if (!judged[i] && isMissed(currentBeat, targets[i])) {
                 judged[i] = true
-                miss++
+                score.miss()
             }
         }
     }
@@ -103,5 +107,5 @@ class SnapCrabsStage(inputOffsetMs: Double = 0.0) {
 
     fun isFinished(currentBeat: Double): Boolean = currentBeat >= end
 
-    fun tally(): ScoreTally = ScoreTally(perfect, ok, miss)
+    fun tally(): ScoreTally = score.tally()
 }

@@ -115,12 +115,16 @@ class BongoBlitzStage(inputOffsetMs: Double = 0.0) {
     }
 
     private val judged = BooleanArray(targets.size)
-    private var perfect = 0
-    private var ok = 0
-    private var miss = 0
+    private val score = Scorekeeper()
 
-    /** Matches [action] to the nearest un-judged target that wants it. Null means a stray (wrong drum, or no target left nearby). */
-    fun recordAction(action: DrumAction, rawBeat: Double): BongoOutcome {
+    /**
+     * Matches [action] to the nearest un-judged target that wants it. A null grade means a stray
+     * (wrong drum, or no target left nearby); that, or a grade short of Perfect, breaks the streak.
+     */
+    fun recordAction(action: DrumAction, rawBeat: Double): BongoOutcome =
+        matchAction(action, rawBeat).also { if (it.grade == null) score.stray() }
+
+    private fun matchAction(action: DrumAction, rawBeat: Double): BongoOutcome {
         val beat = rawBeat - offsetBeats
         var bestIndex = -1
         var bestDelta = Double.MAX_VALUE
@@ -136,7 +140,7 @@ class BongoBlitzStage(inputOffsetMs: Double = 0.0) {
         val errorMs = (beat - targets[bestIndex].beat) * secondsPerBeat * 1000.0
         val grade = judge(errorMs) ?: return BongoOutcome(null, errorMs)
         judged[bestIndex] = true
-        if (grade == Grade.PERFECT) perfect++ else ok++
+        score.hit(grade)
         return BongoOutcome(grade, errorMs)
     }
 
@@ -158,7 +162,7 @@ class BongoBlitzStage(inputOffsetMs: Double = 0.0) {
         for (i in targets.indices) {
             if (!judged[i] && isMissed(beat, targets[i].beat, secondsPerBeat)) {
                 judged[i] = true
-                miss++
+                score.miss()
             }
         }
     }
@@ -168,5 +172,5 @@ class BongoBlitzStage(inputOffsetMs: Double = 0.0) {
 
     fun isFinished(currentBeat: Double): Boolean = currentBeat >= end
 
-    fun tally(): ScoreTally = ScoreTally(perfect, ok, miss)
+    fun tally(): ScoreTally = score.tally()
 }

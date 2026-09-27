@@ -24,6 +24,7 @@ enum class Stage(val label: String, val enabled: Boolean) {
     SNAP_CRABS("Snap Crabs", enabled = true),
     MANGO_CHOP("Mango Chop", enabled = true),
     BONGO_BLITZ("Bongo Blitz", enabled = true),
+    REMIX_1("Remix 1", enabled = true),
 }
 
 /** Each stage's accent color, shared by the main menu here and the Wear menu in `wearApp`. */
@@ -33,6 +34,7 @@ val Stage.accent: Color
         Stage.SNAP_CRABS -> Color(0xFFF07A5E)
         Stage.MANGO_CHOP -> Color(0xFFFFB320)
         Stage.BONGO_BLITZ -> Color(0xFFC77DFF)
+        Stage.REMIX_1 -> Color(0xFFFF6FB5)
     }
 
 /**
@@ -54,7 +56,7 @@ internal expect fun StageBackHandler(enabled: Boolean, onBack: () -> Unit)
 fun App() {
     var stage by remember { mutableStateOf<Stage?>(null) }
     var running by remember { mutableStateOf(false) }
-    // Calibrate's measured tap offset, saved per audio output and applied to Snap Crabs and Mango Chop.
+    // Calibrate's measured tap offset, saved per audio output and applied to every scored stage.
     val calibration = rememberCalibration()
 
     // One note highway ("chart") setting for every stage that has one, so hiding it to play by ear
@@ -100,6 +102,7 @@ fun App() {
                         Stage.SNAP_CRABS -> SnapCrabsScreen(calibration, chart, onRunningChanged = { running = it }, onMenu = onMenu)
                         Stage.MANGO_CHOP -> MangoChopScreen(calibration, chart, onRunningChanged = { running = it }, onMenu = onMenu)
                         Stage.BONGO_BLITZ -> BongoBlitzScreen(calibration, chart, onRunningChanged = { running = it }, onMenu = onMenu)
+                        Stage.REMIX_1 -> Remix1Screen(calibration, chart, onRunningChanged = { running = it }, onMenu = onMenu)
                     }
                 }
             }
@@ -128,6 +131,7 @@ fun WatchStageScreen(
                     Stage.SNAP_CRABS -> SnapCrabsScreen(calibration, chart, onRunningChanged)
                     Stage.MANGO_CHOP -> MangoChopScreen(calibration, chart, onRunningChanged)
                     Stage.BONGO_BLITZ -> BongoBlitzScreen(calibration, chart, onRunningChanged)
+                    Stage.REMIX_1 -> Remix1Screen(calibration, chart, onRunningChanged)
                 }
             }
         }
