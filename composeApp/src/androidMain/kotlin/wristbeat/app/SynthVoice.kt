@@ -174,3 +174,32 @@ internal class BassVoice(startFrame: Long, private val freq: Double, len: Double
         return (filter.process(osc.next(freq)) * g).toFloat()
     }
 }
+
+/** Port of AudioEngine.wasmJs.kt's jsFilteredOsc(): an oscillator through a lowpass sweeping [cutoff0] → [cutoff1] over the note. */
+internal class FilteredOscVoice(
+    startFrame: Long,
+    wave: Wave,
+    private val freq: Double,
+    attack: Double,
+    peak: Double,
+    decay: Double,
+    cutoff0: Double,
+    cutoff1: Double,
+    sampleRate: Int,
+) : SynthVoice(startFrame) {
+    private val osc = Oscillator(wave, sampleRate)
+    private val env = Envelope(attack, peak, decay, sampleRate)
+    private val filter = Biquad(FilterType.LOWPASS, sampleRate)
+    private var cutoff = cutoff0
+    private val cutoffMul = (cutoff1 / cutoff0).pow(1.0 / ((attack + decay) * sampleRate))
+    private var frame = 0
+
+    override fun next(): Float? {
+        val g = env.next() ?: return null
+        // Web Audio's BiquadFilterNode defaults to Q = 1; coefficients every 32 samples, as in BassVoice.
+        if (frame % 32 == 0) filter.set(cutoff, 1.0)
+        frame++
+        cutoff *= cutoffMul
+        return (filter.process(osc.next(freq)) * g).toFloat()
+    }
+}

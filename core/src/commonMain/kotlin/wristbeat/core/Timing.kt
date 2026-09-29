@@ -15,6 +15,12 @@ const val BONGO_BLITZ_BPM = 172.0
  */
 const val REMIX_1_BPM = 128.0
 
+/**
+ * Night Drift's Eurobeat song runs at Eurobeat's own breakneck tempo: second only to Bongo Blitz,
+ * with far more notes in it than any other stage.
+ */
+const val NIGHT_DRIFT_BPM = 155.0
+
 /** Converts an audio-clock time (seconds) into a fractional beat position, given the song's start time [t0Seconds]. */
 fun beatAt(audibleTimeSeconds: Double, t0Seconds: Double): Double =
     (audibleTimeSeconds - t0Seconds) / SECONDS_PER_BEAT

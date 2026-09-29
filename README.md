@@ -75,6 +75,12 @@ A Rhythm Heaven–style remix. One 128 BPM disco-pop song runs straight through 
 swaps from Snap Crabs to Mango Chop to Bongo Blitz, eight bars each, with new patterns and an inked
 wipe between scenes. The song changes key and instruments to follow each stage.
 
+### 🏎️ Night Drift
+A red coupe tears down a neon mountain pass at night to a 155 BPM Eurobeat song. **Tap** to boost
+through the neon gates as they reach you, and **swipe** to drift through the hairpin corners the
+navigator calls out two beats ahead. It has more notes than any other stage, with something to hit
+in every bar, and the final chorus changes key.
+
 ### ⏱️ Calibrate
 A 20-beat click track that measures your audio/input latency. The offset is saved **per audio
 output**, so Bluetooth headphones and the phone speaker each keep their own. It shifts both the

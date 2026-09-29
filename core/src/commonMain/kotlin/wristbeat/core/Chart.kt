@@ -41,11 +41,18 @@ enum class SoundId {
     PAD,
     CLAVE,
     CLAP,
+    SAW_LEAD,
+    SAW_STAB,
+    SNARE,
+    OPEN_HAT,
+    CORNER_CALL,
+    BOOST,
+    SKID,
 }
 
 /**
  * [param] carries a sound-specific extra value (a MIDI note for BASS_*, MEL, STEEL_PAN, KEYS, TOM,
- * MARIMBA, PAN_FLUTE and PAD); other sounds leave it 0.
+ * MARIMBA, PAN_FLUTE, PAD, SAW_LEAD and SAW_STAB); other sounds leave it 0.
  */
 data class ChartEvent(val beat: Double, val sound: SoundId, val param: Double = 0.0)
 
@@ -108,6 +115,25 @@ object Remix1Song {
 
     /** A few beats after [OUTRO]'s final hit, so it rings out before the results come up. */
     const val END = 112.0
+}
+
+/**
+ * Night Drift's song form, in [NIGHT_DRIFT_BPM] beats: a Eurobeat verse, pre-chorus and chorus,
+ * then a shorter second verse and pre-chorus and a final chorus a tone higher. The intro's last
+ * bar is the stick count-in, and the first gates arrive in [VERSE]; drift corners join with
+ * [PRE_CHORUS].
+ */
+object NightDriftSong {
+    const val VERSE = 16.0
+    const val PRE_CHORUS = 48.0
+    const val CHORUS = 80.0
+    const val VERSE_2 = 112.0
+    const val PRE_CHORUS_2 = 128.0
+    const val FINAL_CHORUS = 144.0
+    const val OUTRO = 176.0
+
+    /** A few beats after [OUTRO]'s final hit, so it rings out before the results come up. */
+    const val END = 180.0
 }
 
 object Charts {
@@ -379,7 +405,10 @@ object Charts {
     }
 
     /** One bar of a progression (Bongo Blitz's and Remix 1's): the bass root and a pad/marimba voicing. */
-    private class Chord(val root: Double, val voicing: List<Double>)
+    private class Chord(val root: Double, val voicing: List<Double>) {
+        /** The same chord [semitones] higher, for a key change. */
+        fun up(semitones: Double) = Chord(root + semitones, voicing.map { it + semitones })
+    }
 
     private val B_DM = Chord(38.0, listOf(62.0, 65.0, 69.0))
     private val B_BB = Chord(34.0, listOf(62.0, 65.0, 70.0))
@@ -727,6 +756,171 @@ object Charts {
         }
         events += ChartEvent(outro, SoundId.MARIMBA, 57.0)
         events += ChartEvent(outro, SoundId.MARIMBA, 69.0)
+        return events.sortedBy { it.beat }
+    }
+
+    // Night Drift's chords, in E minor until the final chorus steps up a tone to F# minor.
+    private val E_EM = Chord(40.0, listOf(59.0, 64.0, 67.0))
+    private val E_C = Chord(36.0, listOf(60.0, 64.0, 67.0))
+    private val E_D = Chord(38.0, listOf(62.0, 66.0, 69.0))
+    private val E_B = Chord(35.0, listOf(59.0, 63.0, 66.0))
+    private val E_AM = Chord(45.0, listOf(60.0, 64.0, 69.0))
+    private val E_BM = Chord(35.0, listOf(59.0, 62.0, 66.0))
+    private val E_CS = Chord(37.0, listOf(61.0, 65.0, 68.0))
+
+    /** One chord per bar. The verse and pre-chorus both end on B, the dominant, to push onward. */
+    private val EURO_VERSE_CHORDS = listOf(E_EM, E_C, E_D, E_EM, E_EM, E_C, E_AM, E_B)
+    private val EURO_PRE_CHORDS = listOf(E_AM, E_BM, E_C, E_D, E_AM, E_BM, E_C, E_B)
+
+    /** VI–VII–V–i, the chorus's dramatic minor-key loop; the pre-chorus's B resolves "wrongly" onto its C. */
+    private val EURO_CHORUS_CHORDS = listOf(E_C, E_D, E_B, E_EM)
+    private val EURO_VERSE_2_CHORDS = listOf(E_EM, E_C, E_D, E_B)
+
+    /** The second pre-chorus climbs A–B–C–C# by step, and C# is the new key's dominant for the final chorus. */
+    private val EURO_PRE_2_CHORDS = listOf(E_AM, E_BM, E_C, E_CS)
+
+    /**
+     * Night Drift's hook over two passes of [EURO_CHORUS_CHORDS]: (beat offset, MIDI note). A busy
+     * 8th-note synth riff in the Eurobeat way, climbing a B major arpeggio (a B7 the second time)
+     * into each Em.
+     */
+    private val EURO_HOOK: List<Pair<Double, Double>> = listOf(
+        0.0 to 76.0, 0.5 to 74.0, 1.0 to 76.0, 1.5 to 79.0, 2.0 to 76.0, 2.5 to 74.0, 3.0 to 72.0, 3.5 to 71.0,
+        4.0 to 74.0, 4.5 to 72.0, 5.0 to 74.0, 5.5 to 78.0, 6.0 to 74.0, 6.5 to 72.0, 7.0 to 69.0, 7.5 to 66.0,
+        8.0 to 71.0, 8.5 to 75.0, 9.0 to 78.0, 9.5 to 75.0, 10.0 to 71.0, 10.5 to 75.0, 11.0 to 78.0, 11.5 to 75.0,
+        12.0 to 76.0, 12.5 to 76.0, 13.0 to 79.0, 14.0 to 78.0, 14.5 to 76.0, 15.0 to 74.0, 15.5 to 71.0,
+        16.0 to 76.0, 16.5 to 74.0, 17.0 to 76.0, 17.5 to 79.0, 18.0 to 76.0, 18.5 to 74.0, 19.0 to 72.0, 19.5 to 71.0,
+        20.0 to 74.0, 20.5 to 72.0, 21.0 to 74.0, 21.5 to 78.0, 22.0 to 74.0, 22.5 to 72.0, 23.0 to 69.0, 23.5 to 66.0,
+        24.0 to 71.0, 24.5 to 75.0, 25.0 to 78.0, 25.5 to 75.0, 26.0 to 78.0, 26.5 to 81.0, 27.0 to 83.0, 27.5 to 81.0,
+        28.0 to 79.0, 28.5 to 78.0, 29.0 to 76.0, 30.5 to 71.0, 31.0 to 74.0, 31.5 to 75.0,
+    )
+
+    /** Eurobeat's kit for one bar: four-on-the-floor kick, a snare backbeat and open hats on every offbeat. */
+    private fun euroKit(beat: Double, fill: Boolean): List<ChartEvent> {
+        val events = mutableListOf<ChartEvent>()
+        for (o in 0 until 4) events += ChartEvent(beat + o, SoundId.KICK)
+        events += ChartEvent(beat + 1, SoundId.SNARE)
+        if (fill) events += snareFill(beat + 3) else events += ChartEvent(beat + 3, SoundId.SNARE)
+        for (o in listOf(0.5, 1.5, 2.5, 3.5)) events += ChartEvent(beat + o, SoundId.OPEN_HAT)
+        return events
+    }
+
+    /** Four 16th-note snares across one beat, leading into the next section. */
+    private fun snareFill(beat: Double): List<ChartEvent> = (0 until 4).map { ChartEvent(beat + it * 0.25, SoundId.SNARE) }
+
+    /** Eurobeat's octave bass: 8th notes bouncing between [root] and the octave above, from [from] beats into the bar. */
+    private fun octaveBass(beat: Double, root: Double, from: Double = 0.0): List<ChartEvent> =
+        ((from * 2).toInt() until 8).map { i ->
+            ChartEvent(beat + i * 0.5, if (i % 4 == 0) SoundId.BASS_MED else SoundId.BASS_SHORT, root + if (i % 2 == 1) 12.0 else 0.0)
+        }
+
+    /** Four 8th notes up (or back down) [chord] an octave above its voicing, starting at [beat]. */
+    private fun euroArp(beat: Double, chord: Chord, falling: Boolean): List<ChartEvent> {
+        val up = chord.voicing.map { it + 12 } + (chord.voicing.first() + 24)
+        val notes = if (falling) listOf(up[3], up[2], up[1], up[2]) else up
+        return notes.mapIndexed { i, note -> ChartEvent(beat + i * 0.5, SoundId.SAW_LEAD, note) }
+    }
+
+    /**
+     * Night Drift's own song, a Eurobeat tune in E minor at [NIGHT_DRIFT_BPM]: four-on-the-floor
+     * kick, a snare backbeat, open hats on every offbeat, a bouncing octave bass, brassy saw stabs
+     * and a detuned saw lead on the hook, laid out by [NightDriftSong]:
+     * - **Intro** — the hook's first three bars at full tilt, then a bar of sticks over the kick to
+     *   count in, with a snare fill.
+     * - **Verse** (boost gates only) — the octave bass under a saw arpeggio in each bar's second half.
+     * - **Pre-chorus** (drift corners join) — a climbing progression; the bass holds to the beat for
+     *   the first half of each bar and saw stabs punch the second.
+     * - **Chorus** — the hook over VI–VII–V–i, stabs on every downbeat and a 16th-note shaker
+     *   between the hats.
+     * - **Verse 2** and **Pre-chorus 2** — half as long, the second climbing by step to C#.
+     * - **Final chorus** — the key change: the whole chorus a tone higher, in F# minor.
+     * - **Outro** — a final F# minor hit with a crash and a lead run up the chord.
+     * Snare fills lead into every section, and a crash marks it.
+     */
+    fun nightDriftBacking(): List<ChartEvent> {
+        val events = mutableListOf<ChartEvent>()
+        val verse = NightDriftSong.VERSE
+        val pre = NightDriftSong.PRE_CHORUS
+        val chorus = NightDriftSong.CHORUS
+        val verse2 = NightDriftSong.VERSE_2
+        val pre2 = NightDriftSong.PRE_CHORUS_2
+        val finalChorus = NightDriftSong.FINAL_CHORUS
+        val outro = NightDriftSong.OUTRO
+        val sectionStarts = listOf(pre, chorus, verse2, pre2, finalChorus, outro)
+
+        // Intro: straight in with the hook's first three bars (C, D, B) over the full band.
+        for ((bar, chord) in EURO_CHORUS_CHORDS.take(3).withIndex()) {
+            val b = bar * 4.0
+            events += euroKit(b, fill = false)
+            events += octaveBass(b, chord.root)
+            for (note in chord.voicing) {
+                events += ChartEvent(b, SoundId.PAD, note)
+                events += ChartEvent(b, SoundId.SAW_STAB, note)
+            }
+        }
+        events += ChartEvent(0.0, SoundId.CRASH)
+        for ((offset, note) in EURO_HOOK) if (offset < 12.0) events += ChartEvent(offset, SoundId.SAW_LEAD, note)
+        // Count-in bar: sticks over the kick on Em, the bass holding, and a snare fill into the verse.
+        for (i in 12 until 16) {
+            events += ChartEvent(i.toDouble(), SoundId.STICK)
+            events += ChartEvent(i.toDouble(), SoundId.KICK)
+        }
+        for (note in E_EM.voicing) events += ChartEvent(12.0, SoundId.PAD, note)
+        events += ChartEvent(12.0, SoundId.BASS_LONG, E_EM.root)
+        events += ChartEvent(14.0, SoundId.BASS_LONG, E_EM.root)
+        events += snareFill(15.0)
+
+        var b = verse
+        while (b < outro) {
+            val sectionStart = sectionStarts.lastOrNull { b >= it } ?: verse
+            val chords = when (sectionStart) {
+                pre -> EURO_PRE_CHORDS
+                chorus -> EURO_CHORUS_CHORDS
+                verse2 -> EURO_VERSE_2_CHORDS
+                pre2 -> EURO_PRE_2_CHORDS
+                finalChorus -> EURO_CHORUS_CHORDS.map { it.up(2.0) }
+                else -> EURO_VERSE_CHORDS
+            }
+            val bar = ((b - sectionStart) / 4).toInt()
+            val chord = chords[bar % chords.size]
+
+            events += euroKit(b, fill = b + 4 in sectionStarts)
+            for (note in chord.voicing) events += ChartEvent(b, SoundId.PAD, note)
+            when (sectionStart) {
+                chorus, finalChorus -> {
+                    events += octaveBass(b, chord.root)
+                    for (note in chord.voicing) events += ChartEvent(b, SoundId.SAW_STAB, note)
+                    for (i in 1 until 16 step 2) events += ChartEvent(b + i * 0.25, SoundId.SHAKER)
+                }
+                pre, pre2 -> {
+                    events += ChartEvent(b, SoundId.BASS_MED, chord.root)
+                    events += ChartEvent(b + 1, SoundId.BASS_MED, chord.root)
+                    events += octaveBass(b, chord.root, from = 2.0)
+                    for (o in listOf(2.5, 3.5)) for (note in chord.voicing) events += ChartEvent(b + o, SoundId.SAW_STAB, note + 12)
+                }
+                else -> {
+                    events += octaveBass(b, chord.root)
+                    events += euroArp(b + 2, chord, falling = bar % 2 == 1)
+                }
+            }
+            b += 4
+        }
+        for (crash in listOf(verse, pre, chorus, chorus + 16, verse2, pre2, finalChorus, finalChorus + 16)) {
+            events += ChartEvent(crash, SoundId.CRASH)
+        }
+        for ((offset, note) in EURO_HOOK) {
+            events += ChartEvent(chorus + offset, SoundId.SAW_LEAD, note)
+            events += ChartEvent(finalChorus + offset, SoundId.SAW_LEAD, note + 2)
+        }
+
+        // Outro: the final F# minor hit, with a stab and a lead run up the chord.
+        val home = E_EM.up(2.0)
+        events += finalHit(outro, home.root)
+        for (note in home.voicing) {
+            events += ChartEvent(outro, SoundId.PAD, note)
+            events += ChartEvent(outro, SoundId.SAW_STAB, note)
+        }
+        for ((i, note) in listOf(66.0, 69.0, 73.0, 78.0).withIndex()) events += ChartEvent(outro + i * 0.25, SoundId.SAW_LEAD, note)
         return events.sortedBy { it.beat }
     }
 }

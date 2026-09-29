@@ -57,13 +57,13 @@ import wristbeat.core.SECONDS_PER_BEAT
 fun MainMenu(calibration: Calibration, chart: ChartSetting, onSelect: (Stage) -> Unit) {
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val minDim = minOf(maxWidth, maxHeight).value
-        // Sized so all five entries and the chart toggle fit without scrolling.
-        val titleSize = (minDim * 0.095f).sp
-        val entryLabelSize = (minDim * 0.05f).sp
-        val entrySubtitleSize = (minDim * 0.026f).sp
-        val toggleTextSize = (minDim * 0.037f).sp
-        val entryPadding = (minDim * 0.011f).dp
-        val emblemSize = (minDim * 0.112f).dp
+        // Sized so all six entries and the chart toggle fit without scrolling.
+        val titleSize = (minDim * 0.08f).sp
+        val entryLabelSize = (minDim * 0.043f).sp
+        val entrySubtitleSize = (minDim * 0.023f).sp
+        val toggleTextSize = (minDim * 0.032f).sp
+        val entryPadding = (minDim * 0.0085f).dp
+        val emblemSize = (minDim * 0.086f).dp
         val menuWidth = (minOf(maxWidth, maxHeight) * 1.35f).coerceAtMost(maxWidth * 0.92f)
         val beat = rememberMenuBeat()
 
@@ -172,6 +172,7 @@ fun StageMenuEntry(
                     Stage.MANGO_CHOP -> drawMangoChopEmblem(beat())
                     Stage.BONGO_BLITZ -> drawBongoBlitzEmblem(beat())
                     Stage.REMIX_1 -> drawRemix1Emblem(beat())
+                    Stage.NIGHT_DRIFT -> drawNightDriftEmblem(beat())
                 }
             }
             Column(

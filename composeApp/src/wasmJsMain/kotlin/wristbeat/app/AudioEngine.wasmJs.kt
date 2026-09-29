@@ -156,6 +156,43 @@ actual class AudioEngine actual constructor() {
                 for (i in 0 until 3) jsNoise(ctx, noise, atSeconds + i * 0.011, 0.012, 0.2, "bandpass", 1150.0, 1.2)
                 jsNoise(ctx, noise, atSeconds + 0.033, 0.11, 0.16, "bandpass", 1050.0, 0.9)
             }
+            // Night Drift's Eurobeat lead: two slightly detuned saws for width, through a lowpass
+            // that closes as the note decays, over a quiet square an octave down for body.
+            SoundId.SAW_LEAD -> {
+                val freq = mtof(param)
+                jsFilteredOsc(ctx, "sawtooth", freq, atSeconds, 0.005, 0.035, 0.24, 4200.0, 1400.0)
+                jsFilteredOsc(ctx, "sawtooth", freq * 1.006, atSeconds, 0.005, 0.035, 0.24, 4200.0, 1400.0)
+                jsOsc(ctx, "square", freq / 2.0, atSeconds, 0.005, 0.012, 0.16)
+            }
+            // A brassy chord stab, one call per chord note: detuned saws with a fast filter "blat".
+            SoundId.SAW_STAB -> {
+                val freq = mtof(param)
+                jsFilteredOsc(ctx, "sawtooth", freq, atSeconds, 0.008, 0.028, 0.16, 3000.0, 600.0)
+                jsFilteredOsc(ctx, "sawtooth", freq * 0.994, atSeconds, 0.008, 0.028, 0.16, 3000.0, 600.0)
+            }
+            // A dance snare: a bright burst of noise over a short, dropping body tone.
+            SoundId.SNARE -> {
+                jsNoise(ctx, noise, atSeconds, 0.13, 0.26, "highpass", 1800.0, 1.0)
+                jsOscRamp(ctx, "triangle", 200.0, 150.0, atSeconds, 0.003, 0.22, 0.07)
+            }
+            // Eurobeat's offbeat hat: longer and airier than the closed HAT.
+            SoundId.OPEN_HAT -> jsNoise(ctx, noise, atSeconds, 0.14, 0.06, "highpass", 7200.0, 1.0)
+            // The navigator's corner warning: a two-tone rally beep, up a fourth, above the band.
+            SoundId.CORNER_CALL -> {
+                jsOsc(ctx, "square", 1319.0, atSeconds, 0.003, 0.07, 0.07)
+                jsOsc(ctx, "square", 1760.0, atSeconds + 0.09, 0.003, 0.07, 0.09)
+            }
+            // A boost: a sharp click for the timing, a rising engine growl and a turbo "pssh".
+            SoundId.BOOST -> {
+                jsOsc(ctx, "square", 1200.0, atSeconds, 0.002, 0.1, 0.02)
+                jsOscRamp(ctx, "sawtooth", 90.0, 190.0, atSeconds, 0.004, 0.12, 0.14)
+                jsNoise(ctx, noise, atSeconds + 0.02, 0.16, 0.12, "highpass", 3200.0, 1.0)
+            }
+            // A drift: a tyre screech, a tight band of noise over a falling whine.
+            SoundId.SKID -> {
+                jsNoise(ctx, noise, atSeconds, 0.22, 0.35, "bandpass", 2600.0, 6.0)
+                jsOscRamp(ctx, "sine", 1900.0, 1450.0, atSeconds, 0.004, 0.08, 0.2)
+            }
         }
     }
 }
@@ -236,6 +273,31 @@ private fun jsNoise(ctx: JsAny, buffer: JsAny, t: Double, dur: Double, peak: Dou
         g.gain.exponentialRampToValueAtTime(0.0001, t + 0.002 + dur);
         s.connect(f).connect(g).connect(ctx.destination);
         s.start(t, Math.random() * 0.5); s.stop(t + dur + 0.05);
+    }"""
+)
+
+// Like jsOsc, through a lowpass that sweeps from cutoff0 to cutoff1 over the note (Night Drift's saws).
+private fun jsFilteredOsc(
+    ctx: JsAny,
+    type: String,
+    freq: Double,
+    t: Double,
+    attack: Double,
+    peak: Double,
+    decay: Double,
+    cutoff0: Double,
+    cutoff1: Double,
+): Unit = js(
+    """{
+        var o = ctx.createOscillator(); o.type = type; o.frequency.setValueAtTime(freq, t);
+        var f = ctx.createBiquadFilter(); f.type = 'lowpass';
+        f.frequency.setValueAtTime(cutoff0, t); f.frequency.exponentialRampToValueAtTime(cutoff1, t + attack + decay);
+        var g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(peak, t + attack);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + attack + decay);
+        o.connect(f).connect(g).connect(ctx.destination);
+        o.start(t); o.stop(t + attack + decay + 0.05);
     }"""
 )
 

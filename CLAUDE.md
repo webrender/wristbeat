@@ -21,7 +21,7 @@ build and launch the shared `App()`), but their platform actuals are placeholder
   timing/judgment math, and the stage state machines live here so they can be shared and tested
   without a UI.
   - `Timing.kt` — beat/clock constants (`SECONDS_PER_BEAT` for the shared 116 BPM, `MANGO_CHOP_BPM`,
-    `BONGO_BLITZ_BPM`). Charts are authored in beats; each stage exposes its own seconds-per-beat
+    `BONGO_BLITZ_BPM`, `REMIX_1_BPM`, `NIGHT_DRIFT_BPM`). Charts are authored in beats; each stage exposes its own seconds-per-beat
     where it differs.
   - `Judgment.kt` — `Grade`, `ScoreTally`, `Rank` and the PERFECT/OK/miss math.
   - `Chart.kt` — `SoundId`, `ChartEvent`, and `Charts` (procedural chart generators:
@@ -37,9 +37,11 @@ build and launch the shared `App()`), but their platform actuals are placeholder
     final chord and rings out before the results. Stages place their gameplay on those sections
     (Snap Crabs' easy patterns in the verse, harder ones in the chorus; Mango Chop's pineapples and
     Bongo Blitz's low-drum swipes both arrive with the bridge). `remix1Backing` is Remix 1's song
-    (see **Remix 1** below), laid out by `Remix1Song`, with its own `CLAP` voice for the backbeat.
+    (see **Remix 1** below), laid out by `Remix1Song`, with its own `CLAP` voice for the backbeat. `nightDriftBacking` is
+    Night Drift's Eurobeat song (see **Night Drift** below), laid out by `NightDriftSong`, with its
+    own `SAW_LEAD`, `SAW_STAB`, `SNARE` and `OPEN_HAT` voices.
   - `CalibrateStage.kt`, `SnapCrabsStage.kt`, `MangoChopStage.kt`, `BongoBlitzStage.kt`,
-    `Remix1Stage.kt` — per-stage
+    `Remix1Stage.kt`, `NightDriftStage.kt` — per-stage
     state machines (`recordTap`/`recordAction`, `updateMisses`, `tally`, and `perceivedBeat`, which
     the screens draw at so visuals follow the calibrated offset).
 - **`composeApp/`** — the Compose UI and platform adapters.
@@ -49,7 +51,7 @@ build and launch the shared `App()`), but their platform actuals are placeholder
     offset — the mobile/web counterpart to `wearApp`'s native menu), `CalibrateScreen.kt`,
     `SnapCrabsScreen.kt`, `MangoChopScreen.kt`, `BongoBlitzScreen.kt` (each also exposes its whole
     scene as `drawSnapCrabsScene`/`drawMangoChopScene`/`drawBongoBlitzScene`, which Remix 1 reuses),
-    `Remix1Screen.kt`,
+    `Remix1Screen.kt`, `NightDriftScreen.kt`,
     `Hud.kt` (shared HUD text/chip styling), `StageHud.kt` (shared HUD bits: the chart toggle,
     `ReportRunning`), `Results.kt` (`StageResults`, the fullscreen wipe-and-count-up screen a run
     transitions into when it ends, playing a cheer/boo sound), `NoteHighway.kt` (the shared note
@@ -83,7 +85,7 @@ into the same timebase before judging, per HANDOFF's timing-accuracy requirement
 ## Current status (playable today, on web)
 
 - **Main menu** (`MainMenu.kt`) — the app opens on a menu, not straight into a stage: pick Calibrate,
-  Snap Crabs, Mango Chop, Bongo Blitz or Remix 1, or toggle the note highway ("chart") on/off, mirroring the native menu
+  Snap Crabs, Mango Chop, Bongo Blitz, Remix 1 or Night Drift, or toggle the note highway ("chart") on/off, mirroring the native menu
   `wearApp` already had on the watch. A stage is full-bleed game with no title, tap/swipe
   instructions, or top HUD chrome of its own while it's being played (a tutorial stage will cover
   that explanation later), and its song starts automatically the moment it opens — no tap needed.
@@ -129,8 +131,23 @@ into the same timebase before judging, per HANDOFF's timing-accuracy requirement
   (`drawWipe`). Inputs are a unified tap/swipe (`RemixAction`), judged like Bongo Blitz (the wrong
   action is a stray); the crab third ignores swipes. `Remix1StageTest` checks each third's targets
   stay in their scene and finish before the wipe, and the same spacing/swipe rules as Bongo Blitz.
+- **Night Drift** (`NightDriftStage.kt`, `NightDriftScreen.kt`) — a standalone song stage (not a
+  remix) after Remix 1: a red coupe races down a neon mountain pass at night to a Eurobeat song at
+  155 BPM (`Charts.nightDriftBacking`: E minor, octave bass, open offbeat hats, saw stabs and a
+  detuned saw lead on the hook, and a final chorus a tone higher in F# minor). Neon gates come up
+  the road and the player **taps** to boost through each as it reaches the car (exhaust flame); from
+  the pre-chorus on, chevron-board corners take a **swipe** to drift (the car swings sideways in tyre
+  smoke). Each corner is called `CORNER_CALL_BEATS` (2) ahead by a two-tone navigator beep
+  (`CORNER_CALL`) and a flashing roadside sign. It's the densest chart in the game — a note on nearly
+  every beat plus eighth-note pairs and runs, about three times Remix 1's notes per second — but
+  `NightDriftStageTest` holds it to: no two notes closer than an eighth, no more than four eighths in
+  a row, every drift a full beat clear on both sides, and at least two notes in every bar. The lane
+  dashes and roadside lamps rush past once per beat, so the car's speed is locked to the tempo.
+  Judged like Bongo Blitz (the wrong action is a stray). The road's gates are always drawn (they're
+  the stage's objects, like Mango Chop's fruit); the note highway sits above them and hides with
+  the chart toggle as usual.
 - **Perfect streak** (`Streak.kt`'s `StreakBadge`) — every scored stage counts back-to-back Perfects
-  (`Judgment.kt`'s `Scorekeeper`, shared by all four stages; `ScoreTally.streak`). Anything short of
+  (`Judgment.kt`'s `Scorekeeper`, shared by every scored stage; `ScoreTally.streak`). Anything short of
   a Perfect — an OK, a miss, or a stray input (a whiff, or the wrong action) — resets it. Once it's
   above 5, a gold inked starburst with the count over a red "Streak" ribbon pops in at the top of
   the stage square. It throbs on every beat and pops with a spark ring on each further Perfect. It
@@ -140,7 +157,7 @@ into the same timebase before judging, per HANDOFF's timing-accuracy requirement
   calibration. `submitScore` runs when a song ends. The results screen then shows a wobbling gold
   "New record!" badge with a chime once the count-up lands (a first finish with a score above zero
   counts), or the standing "Best N%" otherwise.
-- **Results** (`Results.kt`) — Snap Crabs, Mango Chop, Bongo Blitz and Remix 1 no longer show a live Perfect/OK/Miss tally
+- **Results** (`Results.kt`) — Snap Crabs, Mango Chop, Bongo Blitz, Remix 1 and Night Drift no longer show a live Perfect/OK/Miss tally
   or rank during play; instead, once the song ends, an accent-colored panel wipes fully across the
   screen (`StageResults`'s `wipe` `Animatable`, sliding off to reveal what's behind it), replacing
   the frozen game with an opaque fullscreen backdrop — a radial gradient plus a slow-turning

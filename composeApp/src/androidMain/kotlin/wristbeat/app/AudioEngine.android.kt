@@ -134,6 +134,36 @@ actual class AudioEngine actual constructor() {
                 for (i in 0 until 3) noise(t + i * 0.011, 0.012, 0.2, FilterType.BANDPASS, 1150.0, 1.2)
                 noise(t + 0.033, 0.11, 0.16, FilterType.BANDPASS, 1050.0, 0.9)
             }
+            // Same voicings as AudioEngine.wasmJs.kt's Night Drift band and sounds.
+            SoundId.SAW_LEAD -> {
+                val freq = mtof(param)
+                filteredOsc(Wave.SAWTOOTH, freq, t, 0.005, 0.035, 0.24, 4200.0, 1400.0)
+                filteredOsc(Wave.SAWTOOTH, freq * 1.006, t, 0.005, 0.035, 0.24, 4200.0, 1400.0)
+                osc(Wave.SQUARE, freq / 2.0, t, 0.005, 0.012, 0.16)
+            }
+            SoundId.SAW_STAB -> {
+                val freq = mtof(param)
+                filteredOsc(Wave.SAWTOOTH, freq, t, 0.008, 0.028, 0.16, 3000.0, 600.0)
+                filteredOsc(Wave.SAWTOOTH, freq * 0.994, t, 0.008, 0.028, 0.16, 3000.0, 600.0)
+            }
+            SoundId.SNARE -> {
+                noise(t, 0.13, 0.26, FilterType.HIGHPASS, 1800.0, 1.0)
+                osc(Wave.TRIANGLE, 200.0, t, 0.003, 0.22, 0.07, endFreq = 150.0)
+            }
+            SoundId.OPEN_HAT -> noise(t, 0.14, 0.06, FilterType.HIGHPASS, 7200.0, 1.0)
+            SoundId.CORNER_CALL -> {
+                osc(Wave.SQUARE, 1319.0, t, 0.003, 0.07, 0.07)
+                osc(Wave.SQUARE, 1760.0, t + 0.09, 0.003, 0.07, 0.09)
+            }
+            SoundId.BOOST -> {
+                osc(Wave.SQUARE, 1200.0, t, 0.002, 0.1, 0.02)
+                osc(Wave.SAWTOOTH, 90.0, t, 0.004, 0.12, 0.14, endFreq = 190.0)
+                noise(t + 0.02, 0.16, 0.12, FilterType.HIGHPASS, 3200.0, 1.0)
+            }
+            SoundId.SKID -> {
+                noise(t, 0.22, 0.35, FilterType.BANDPASS, 2600.0, 6.0)
+                osc(Wave.SINE, 1900.0, t, 0.004, 0.08, 0.2, endFreq = 1450.0)
+            }
         }
     }
 }
@@ -160,6 +190,11 @@ private fun osc(wave: Wave, freq: Double, t: Double, attack: Double, peak: Doubl
 
 private fun noise(t: Double, dur: Double, peak: Double, filterType: FilterType, freq: Double, q: Double) =
     AndroidAudio.schedule(NoiseVoice(AndroidAudio.frameAt(t), filterType, freq, q, dur, peak, AndroidAudio.sampleRate))
+
+private fun filteredOsc(wave: Wave, freq: Double, t: Double, attack: Double, peak: Double, decay: Double, cutoff0: Double, cutoff1: Double) =
+    AndroidAudio.schedule(
+        FilteredOscVoice(AndroidAudio.frameAt(t), wave, freq, attack, peak, decay, cutoff0, cutoff1, AndroidAudio.sampleRate),
+    )
 
 private fun bass(freq: Double, t: Double, len: Double) =
     AndroidAudio.schedule(BassVoice(AndroidAudio.frameAt(t), freq, len, AndroidAudio.sampleRate))
